@@ -2,8 +2,11 @@
 
 namespace App\Filament\Resources\Vendors\Schemas;
 
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class VendorForm
@@ -12,24 +15,41 @@ class VendorForm
     {
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->required(),
-                TextInput::make('slug')
-                    ->required(),
-                TextInput::make('email')
-                    ->label('Email address')
-                    ->email(),
-                TextInput::make('phone')
-                    ->tel(),
-                TextInput::make('gst_number'),
-                Textarea::make('address')
-                    ->columnSpanFull(),
-                TextInput::make('logo'),
-                TextInput::make('status')
-                    ->required()
-                    ->default('pending'),
-                TextInput::make('created_by')
-                    ->numeric(),
+                Section::make('Vendor Information')
+                ->schema([
+                    TextInput::make('name')
+                        ->required()
+                        ->maxLength(255),
+
+                    TextInput::make('slug')
+                        ->required()
+                        ->unique(ignoreRecord: true),
+
+                    TextInput::make('email')
+                        ->email(),
+
+                    TextInput::make('phone'),
+
+                    TextInput::make('gst_number'),
+
+                    Select::make('status')
+                        ->options([
+                            'pending' => 'Pending',
+                            'active' => 'Active',
+                            'suspended' => 'Suspended',
+                            'cancelled' => 'Cancelled',
+                        ])
+                        ->required(),
+
+                    Textarea::make('address')
+                        ->rows(3),
+
+                    FileUpload::make('logo')
+                        ->image()
+                        ->directory('vendors'),
+                ])
+                ->columns(2),
+
             ]);
     }
 }
