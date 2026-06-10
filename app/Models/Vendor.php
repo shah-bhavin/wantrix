@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Enums\VendorStatus;
 
 class Vendor extends Model
 {
@@ -19,6 +20,9 @@ class Vendor extends Model
         'logo',
         'status',
         'created_by',
+    ];
+    protected $casts = [
+        'status' => VendorStatus::class,
     ];
 
     public function users()

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -11,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password'])]
+#[Fillable(['name', 'email', 'avatar', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -27,6 +28,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
+            'status' => UserStatus::class,
             'password' => 'hashed',
         ];
     }
@@ -34,5 +37,32 @@ class User extends Authenticatable
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->name;
+    }
+
+    public function getInitialsAttribute(): string
+    {
+        return collect(explode(' ', $this->name))
+            ->map(fn($word) => strtoupper(substr($word, 0, 1)))
+            ->take(2)
+            ->implode('');
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        return $this->avatar
+            ? asset('storage/' . $this->avatar)
+            : null;
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->avatar
+            ? asset('storage/' . $this->avatar)
+            : null;
     }
 }
