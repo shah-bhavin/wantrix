@@ -17,9 +17,6 @@ class UsersTable
     {
         return $table
             ->columns([
-                TextColumn::make('vendor_id')
-                    ->numeric()
-                    ->sortable(),
                 ImageColumn::make('avatar')
                     ->circular(),
                 TextColumn::make('vendor.name')
@@ -37,17 +34,6 @@ class UsersTable
                     ->formatStateUsing(fn($state) => $state->label()),
                 TextColumn::make('roles.name')
                     ->badge()
-                // TextColumn::make('email_verified_at')
-                //     ->dateTime()
-                //     ->sortable(),
-                // TextColumn::make('created_at')
-                //     ->dateTime()
-                //     ->sortable()
-                //     ->toggleable(isToggledHiddenByDefault: true),
-                // TextColumn::make('updated_at')
-                //     ->dateTime()
-                //     ->sortable()
-                //     ->toggleable(isToggledHiddenByDefault: true)
             ])
             ->filters([
                 //
