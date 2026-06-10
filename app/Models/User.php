@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'avatar', 'password'])]
+#[Fillable(['name', 'email', 'avatar', 'password', 'status', 'avatar', ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -24,6 +24,10 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+
+    protected $casts = [
+        'status' => UserStatus::class,
+    ];
     protected function casts(): array
     {
         return [

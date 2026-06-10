@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use App\Enums\UserStatus;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -20,19 +21,19 @@ class UserForm
                     ->relationship(name: 'vendor', titleAttribute: 'name')
                     ->searchable()
                     ->preload(),
-                Toggle::make('is_active')
-                    ->required(),
                 TextInput::make('name')
                     ->required(),
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
                     ->required(),
+                TextInput::make('phone')
+                    ->tel(),
                 TextInput::make('password')
                     ->password()
                     ->revealable()
                     ->dehydrateStateUsing(
-                        fn ($state) => filled($state)
+                        fn($state) => filled($state)
                             ? bcrypt($state)
                             : null
                     )
@@ -45,14 +46,21 @@ class UserForm
                     ->preload()  // Instantly populates the roles list upon clicking
                     ->searchable(),
 
-                DateTimePicker::make('email_verified_at'),
-                TextInput::make('password')
-                    ->password()
+                DateTimePicker::make('email_verified_at'),             
+                
+                Select::make('status')
+                    ->options(
+                        collect(UserStatus::cases())
+                            ->mapWithKeys(fn($status) => [
+                                $status->value => $status->label(),
+                            ])
+                            ->toArray()
+                    )
                     ->required(),
                 FileUpload::make('avatar')
                     ->image()
                     ->directory('avatars')
-                    ->avatar()
+                    ->avatar(),
             ]);
     }
 }

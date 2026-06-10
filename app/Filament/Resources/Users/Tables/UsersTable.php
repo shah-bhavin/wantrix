@@ -7,6 +7,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\FileUpload;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -19,6 +20,11 @@ class UsersTable
                 TextColumn::make('vendor_id')
                     ->numeric()
                     ->sortable(),
+                ImageColumn::make('avatar')
+                    ->circular(),
+                TextColumn::make('vendor.name')
+                    ->searchable()
+                    ->sortable(),
                 IconColumn::make('is_active')
                     ->boolean(),
                 TextColumn::make('name')
@@ -26,17 +32,22 @@ class UsersTable
                 TextColumn::make('email')
                     ->label('Email address')
                     ->searchable(),
-                TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn($state) => $state->label()),
+                TextColumn::make('roles.name')
+                    ->badge()
+                // TextColumn::make('email_verified_at')
+                //     ->dateTime()
+                //     ->sortable(),
+                // TextColumn::make('created_at')
+                //     ->dateTime()
+                //     ->sortable()
+                //     ->toggleable(isToggledHiddenByDefault: true),
+                // TextColumn::make('updated_at')
+                //     ->dateTime()
+                //     ->sortable()
+                //     ->toggleable(isToggledHiddenByDefault: true)
             ])
             ->filters([
                 //
