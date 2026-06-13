@@ -45,4 +45,9 @@ class Vendor extends Model
         return $this->hasOne(Subscription::class)
             ->latestOfMany();
     }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
 }

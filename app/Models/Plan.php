@@ -23,6 +23,12 @@ class Plan extends Model
         'is_popular',
         'status',
         'sort_order',
+        'trial_days',
+        'is_unlimited_contacts',
+        'is_unlimited_whatsapp_numbers',
+        'is_unlimited_campaigns',
+        'is_unlimited_users',
+        'max_contacts'
     ];
 
     protected $casts = [

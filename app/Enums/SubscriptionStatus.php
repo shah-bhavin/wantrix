@@ -21,4 +21,21 @@ enum SubscriptionStatus: string
             self::CANCELLED => 'Cancelled',
         };
     }
+    public function canAccessFeatures(): bool
+    {
+        return in_array($this, [
+            self::TRIAL,
+            self::ACTIVE,
+        ]);
+    }
+
+    public function isExpired(): bool
+    {
+        return $this === self::EXPIRED;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this === self::CANCELLED;
+    }
 }
