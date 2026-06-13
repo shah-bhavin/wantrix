@@ -46,4 +46,20 @@ class Plan extends Model
     {
         return $this->hasMany(Subscription::class);
     }
+
+    public static function defaultPlan(): ?self
+    {
+        return self::query()
+            ->where('is_default', true)
+            ->first();
+    }
+    public function oldSubscriptionChanges()
+    {
+        return $this->hasMany(SubscriptionChange::class, 'old_plan_id');
+    }
+
+    public function newSubscriptionChanges()
+    {
+        return $this->hasMany(SubscriptionChange::class, 'new_plan_id');
+    }
 }

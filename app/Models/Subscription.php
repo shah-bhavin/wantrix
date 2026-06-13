@@ -49,7 +49,8 @@ class Subscription extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public static function hasActiveSubscription(int $vendorId): bool {
+    public static function hasActiveSubscription(int $vendorId): bool
+    {
         return self::query()
             ->where('vendor_id', $vendorId)
             ->whereIn('status', [
@@ -61,5 +62,9 @@ class Subscription extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 }

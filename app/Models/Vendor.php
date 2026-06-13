@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\VendorStatus;
+use App\Observers\VendorObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Enums\VendorStatus;
 
 class Vendor extends Model
 {
@@ -49,5 +51,15 @@ class Vendor extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function subscriptionChanges()
+    {
+        return $this->hasMany(SubscriptionChange::class);
     }
 }

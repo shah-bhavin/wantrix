@@ -50,6 +50,6 @@ class VendorForm
                 ])
                 ->columns(2),
 
-            ]);
+            ])->columns(1);
     }
 }
