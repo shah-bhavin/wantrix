@@ -34,4 +34,15 @@ class Vendor extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    public function currentSubscription()
+    {
+        return $this->hasOne(Subscription::class)
+            ->latestOfMany();
+    }
 }

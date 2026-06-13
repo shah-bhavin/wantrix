@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('slug')->unique();
 
             $table->text('description')->nullable();
-
+            $table->integer('trial_days')->default(0);
             $table->decimal('monthly_price', 10, 2)->default(0);
             $table->decimal('yearly_price', 10, 2)->default(0);
 
@@ -30,6 +30,14 @@ return new class extends Migration
             $table->integer('max_whatsapp_numbers')->default(0);
 
             $table->integer('max_campaigns_per_month')->default(0);
+
+            $table->boolean('is_unlimited_users')->default(false);
+
+            $table->boolean('is_unlimited_contacts')->default(false);
+
+            $table->boolean('is_unlimited_whatsapp_numbers')->default(false);
+
+            $table->boolean('is_unlimited_campaigns')->default(false);
 
             $table->boolean('is_popular')->default(false);
 

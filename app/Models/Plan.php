@@ -30,6 +30,14 @@ class Plan extends Model
         'is_popular' => 'boolean',
         'monthly_price' => 'decimal:2',
         'yearly_price' => 'decimal:2',
+        'is_unlimited_users' => 'boolean',
+        'is_unlimited_contacts' => 'boolean',
+        'is_unlimited_whatsapp_numbers' => 'boolean',
+        'is_unlimited_campaigns' => 'boolean',
     ];
 
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
+    }
 }

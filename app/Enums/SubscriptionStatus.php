@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Enums;
+
+enum SubscriptionStatus: string
+{
+    case TRIAL = 'trial';
+
+    case ACTIVE = 'active';
+
+    case EXPIRED = 'expired';
+
+    case CANCELLED = 'cancelled';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::TRIAL => 'Trial',
+            self::ACTIVE => 'Active',
+            self::EXPIRED => 'Expired',
+            self::CANCELLED => 'Cancelled',
+        };
+    }
+}
