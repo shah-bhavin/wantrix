@@ -2,6 +2,7 @@
 
 use App\Models\Plan;
 use App\Models\Vendor;
+use App\Services\UsageService;
 
 class FeatureAccessService
 {
@@ -29,6 +30,6 @@ class FeatureAccessService
             return true;
         }
 
-        return $vendor->users()->count() < $plan->max_users;
+        return app(UsageService::class) < $plan->max_users;
     }
 }

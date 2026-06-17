@@ -1,5 +1,10 @@
 <?php 
 
+use App\Models\Plan;
+use App\Models\Subscription;
+use App\Models\Vendor;
+use App\Services\UsageService;
+
 class SubscriptionService
 {
     public function getActiveSubscription(Vendor $vendor): ?Subscription
@@ -19,7 +24,7 @@ class SubscriptionService
         if ($plan->is_unlimited_users) {
             return true;
         }
-        return $vendor->users()->count() < $plan->max_users;
+        return app(UsageService::class) < $plan->max_users;
     }
 }
 
