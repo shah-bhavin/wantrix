@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Auth\RegisterCompany;
+use App\Livewire\Auth\RegisterVendor;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
@@ -13,3 +15,7 @@ Route::view('profile', 'profile')
     ->name('profile');
 
 require __DIR__.'/auth.php';
+
+Route::middleware('guest')->group(function () {
+    Route::get('/register-company', RegisterCompany::class)->name('register-company');
+});

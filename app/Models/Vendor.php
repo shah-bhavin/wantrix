@@ -20,6 +20,13 @@ class Vendor extends Model
         'gst_number',
         'address',
         'logo',
+        'website',
+        'city',
+        'state',
+        'country',
+        'postal_code',
+        'gst_number',
+        'timezone',
         'status',
         'created_by',
     ];

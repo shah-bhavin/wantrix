@@ -26,11 +26,16 @@ return [
     //     'icon' => 'device-phone-mobile',
     //     'route' => 'vendor.whatsapp-accounts',
     // ],
-    // [
-    //     'label' => 'Billing',
-    //     'icon' => 'credit-card',
-    //     'route' => 'vendor.billing',
-    // ],
+    [
+        'label' => 'Billing',
+        'icon' => 'credit-card',
+        'route' => 'vendor.billing',
+    ],
+    [
+        'label' => 'Invoices',
+        'icon' => 'credit-card',
+        'route' => 'vendor.billing.invoices',
+    ],
     // [
     //     'label' => 'Settings',
     //     'icon' => 'cog-6-tooth',
