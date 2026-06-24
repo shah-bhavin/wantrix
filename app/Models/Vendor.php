@@ -78,4 +78,11 @@ class Vendor extends Model
     {
         return $this->hasMany(Contact::class);
     }
+
+    public function tags()
+    {
+        return $this->hasMany(Tag::class);
+    }
+
+
 }

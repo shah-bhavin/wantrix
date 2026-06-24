@@ -130,7 +130,19 @@
                             class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
                         @error('company') <div class="text-red-500 text-xs mt-1 px-1">{{ $message }}</div> @enderror
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Tags</label>
 
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach($tags as $tag)
+                                <label class="flex items-center gap-2 p-2 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input type="checkbox" value="{{ $tag->id }}" wire:model="selectedTags" class="rounded text-amber-500 focus:ring-amber-500 border-slate-300">
+                                    <span class="text-sm text-slate-700">{{ $tag->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                    
                     <select wire:model="status" class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500 text-sm text-slate-700">
                         @foreach(\App\Enums\ContactStatus::cases() as $status)
                             <option value="{{ $status->value }}">
@@ -228,6 +240,7 @@
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Email</th>
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Company</th>
+                    <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">tags</th>
                     <th class="p-4 text-xs font-semibold uppercase">Actions</th>
                 </tr>
             </thead>
@@ -262,7 +275,16 @@
                     <td class="p-4 text-slate-600">
                         {{ $contact->company ?? '-' }}
                     </td>
-                    
+                    <td class="p-4">
+                        <div class="flex flex-wrap gap-1">
+                            @foreach($contact->tags as $tag)
+                                <span class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700">
+                                    {{ $tag->name }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </td>
+
                     <td class="p-4">
                         <div class="flex gap-2">
                             <button wire:click="editContact({{ $contact->id }})" class="px-3 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs">

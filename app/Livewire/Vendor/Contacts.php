@@ -23,6 +23,8 @@ class Contacts extends Component
     public ?int $editingContactId = null;
     public ?int $deletingContactId = null;
 
+    public array $selectedTags = [];
+    
     protected function rules(): array
     {
         return [
@@ -43,9 +45,13 @@ class Contacts extends Component
     {
         $data = $this->validate();
 
-        app(CreateContactAction::class)->execute(
+        $contact = app(CreateContactAction::class)->execute(
             auth()->user()->vendor,
             $data
+        );
+
+        $contact->tags()->sync(
+            $this->selectedTags
         );
 
         $this->reset([
@@ -63,6 +69,8 @@ class Contacts extends Component
     public function render()
     {
         $vendorId = auth()->user()->vendor->id;
+
+        $tags = auth()->user()->vendor->tags()->orderBy('name')->get();
 
         $totalContacts = Contact::where('vendor_id', $vendorId)->count();
 
@@ -94,6 +102,7 @@ class Contacts extends Component
 
         return view('livewire.vendor.contacts', [
             'contacts' => $contacts,
+            'tags' => $tags,
             'totalContacts' => $totalContacts,
             'activeContacts' => $activeContacts,
             'blockedContacts' => $blockedContacts,
@@ -103,8 +112,12 @@ class Contacts extends Component
 
     public function editContact(int $id): void
     {
+        
         $contact = Contact::findOrFail($id);
-
+        $this->selectedTags = $contact
+            ->tags()
+            ->pluck('tags.id')
+            ->toArray();
         $this->editingContactId = $contact->id;
         $this->name = $contact->name;
         $this->phone_number = $contact->phone_number;
@@ -118,6 +131,10 @@ class Contacts extends Component
     {
         $data = $this->validate();
         Contact::where('id', $this->editingContactId)->update($data);
+
+        $contact = Contact::findOrFail($this->editingContactId);
+        $contact->tags()->sync($this->selectedTags);
+
         $this->showEditModal = false;
         session()->flash('success', 'Contact updated successfully.');
     }

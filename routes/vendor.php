@@ -7,6 +7,7 @@ use App\Livewire\Vendor\Dashboard;
 use App\Livewire\Vendor\Invoices;
 use App\Livewire\Vendor\Payments;
 use App\Livewire\Vendor\SubscriptionHistory;
+use App\Livewire\Vendor\Tags;
 use App\Livewire\Vendor\UpgradePlan;
 use App\Livewire\Vendor\WhatsappAccounts;
 use Illuminate\Support\Facades\Route;
@@ -24,5 +25,6 @@ Route::middleware(['auth'])
         Route::get('/settings/company', CompanySettings::class)->name('settings.company');
         Route::get('/whatsapp-accounts', WhatsappAccounts::class)->name('whatsapp.accounts');
         Route::get('/contacts', Contacts::class)->name('contacts');
+        Route::get('/tags', Tags::class)->name('tags');
     });
 
