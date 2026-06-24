@@ -69,4 +69,13 @@ class Vendor extends Model
     {
         return $this->hasMany(SubscriptionChange::class);
     }
+    public function whatsappAccounts()
+    {
+        return $this->hasMany(WhatsappAccount::class);
+    }
+
+    public function contacts()
+    {
+        return $this->hasMany(Contact::class);
+    }
 }

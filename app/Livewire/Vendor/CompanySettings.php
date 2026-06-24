@@ -86,6 +86,6 @@ class CompanySettings extends Component
 
     public function render()
     {
-        return view('livewire.vendor.company-settings')->layout('layouts.vendor');;
+        return view('livewire.vendor.company-settings')->layout('layouts.vendor');
     }
 }
