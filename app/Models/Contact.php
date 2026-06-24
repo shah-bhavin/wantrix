@@ -33,6 +33,10 @@ class Contact extends Model
     {
         return $this->belongsToMany(Tag::class);
     }
+    public function groups()
+    {
+        return $this->belongsToMany(Group::class);
+    }
 
 
 }

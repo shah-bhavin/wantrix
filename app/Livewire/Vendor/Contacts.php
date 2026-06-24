@@ -88,6 +88,7 @@ class Contacts extends Component
 
 
         $contacts = Contact::query()
+            ->with(['tags', 'groups'])
             ->where('vendor_id', auth()->user()->vendor->id)
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
@@ -98,7 +99,7 @@ class Contacts extends Component
                 });
             })
             ->latest()
-            ->paginate(1);
+            ->paginate(10);
 
         return view('livewire.vendor.contacts', [
             'contacts' => $contacts,

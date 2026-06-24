@@ -4,6 +4,9 @@ use App\Livewire\Vendor\Billing;
 use App\Livewire\Vendor\CompanySettings;
 use App\Livewire\Vendor\Contacts;
 use App\Livewire\Vendor\Dashboard;
+use App\Livewire\Vendor\GroupContacts;
+use App\Livewire\Vendor\Groups;
+use App\Livewire\Vendor\ImportContacts;
 use App\Livewire\Vendor\Invoices;
 use App\Livewire\Vendor\Payments;
 use App\Livewire\Vendor\SubscriptionHistory;
@@ -26,5 +29,8 @@ Route::middleware(['auth'])
         Route::get('/whatsapp-accounts', WhatsappAccounts::class)->name('whatsapp.accounts');
         Route::get('/contacts', Contacts::class)->name('contacts');
         Route::get('/tags', Tags::class)->name('tags');
+        Route::get('/contacts/import', ImportContacts::class)->name('contacts.import');
+        Route::get('/groups', Groups::class)->name('groups');
+        Route::get('/groups/{group}', GroupContacts::class)->name('groups.contacts');
     });
 

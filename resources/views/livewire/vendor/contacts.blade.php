@@ -241,6 +241,7 @@
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Company</th>
                     <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">tags</th>
+                    <th class="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Groups</th>
                     <th class="p-4 text-xs font-semibold uppercase">Actions</th>
                 </tr>
             </thead>
@@ -284,6 +285,19 @@
                             @endforeach
                         </div>
                     </td>
+                    
+                    <td class="p-4">
+                        <div class="flex flex-wrap gap-1">
+                            @forelse($contact->groups as $group)
+                                <span class="px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-100 text-blue-700">
+                                    {{ $group->name }}
+                                </span>
+                            @empty
+                                <span class="text-slate-400 text-xs">-</span>
+                            @endforelse
+                        </div>
+                    </td>
+
 
                     <td class="p-4">
                         <div class="flex gap-2">
