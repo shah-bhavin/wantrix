@@ -16,16 +16,26 @@ return [
         'icon' => 'users',
         'route' => 'vendor.groups',
     ],
-    // [
-    //     'label' => 'Campaigns',
-    //     'icon' => 'megaphone',
-    //     'route' => 'vendor.campaigns',
-    // ],
-    // [
-    //     'label' => 'Templates',
-    //     'icon' => 'chat-bubble-left-right',
-    //     'route' => 'vendor.templates',
-    // ],
+    [
+        'label' => 'Campaigns',
+        'icon' => 'megaphone',
+        'route' => 'vendor.campaigns',
+    ],
+    [
+        'label' => 'Templates',
+        'icon' => 'chat-bubble-left-right',
+        'route' => 'vendor.templates',
+    ],
+    [
+        'label' => 'Messages',
+        'icon' => 'chat-bubble-left-right',
+        'route' => 'vendor.messages',
+    ],
+    [
+        'label' => 'analytics',
+        'icon' => 'chat-bubble-left-right',
+        'route' => 'vendor.analytics',
+    ],
     // [
     //     'label' => 'WhatsApp Accounts',
     //     'icon' => 'device-phone-mobile',

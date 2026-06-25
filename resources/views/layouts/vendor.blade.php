@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
     <title>{{ config('app.name') }}</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
+
 <body class="bg-slate-100">
     <div class="min-h-screen flex">
         {{-- Sidebar --}}
@@ -21,11 +23,15 @@
 
             {{-- Page Content --}}
             <main class="flex-1 p-6">
+                
+                
                 {{ $slot }}
             </main>
         </div>
-    </div>
 
+    </div>
+    <x-flash-message />
     @livewireScripts
 </body>
+
 </html>

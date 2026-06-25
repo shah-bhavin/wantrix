@@ -10,13 +10,21 @@ class WhatsappAccount extends Model
         'vendor_id',
         'name',
         'phone_number',
+        'provider',
         'country_code',
         'status',
         'waba_id',
         'phone_number_id',
+        'access_token',
+        'is_active',
         'business_id',
-    ];    
+    ];
     protected $casts = [
         'connected_at' => 'datetime',
     ];
+
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class);
+    }
 }

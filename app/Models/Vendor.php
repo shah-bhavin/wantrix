@@ -88,5 +88,19 @@ class Vendor extends Model
         return $this->hasMany(Group::class);
     }
 
+    public function templates()
+    {
+        return $this->hasMany(Template::class);
+    }
+
+    public function campaigns()
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
 
 }

@@ -38,5 +38,10 @@ class Contact extends Model
         return $this->belongsToMany(Group::class);
     }
 
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
+
 
 }

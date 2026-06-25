@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('vendor_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('phone_number');
+            $table->string('provider')->default('meta');
             $table->string('country_code')->default('91');
             $table->string('status')->default(\App\Enums\WhatsappAccountStatus::PENDING->value);
 
@@ -24,6 +25,8 @@ return new class extends Migration
             */
             $table->string('waba_id')->nullable();
             $table->string('phone_number_id')->nullable();
+            $table->longText('access_token')->nullable();
+            $table->boolean('is_active')->default(false);
             $table->string('business_id')->nullable();
             $table->timestamp('connected_at')->nullable();
             $table->timestamps();
