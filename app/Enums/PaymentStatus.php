@@ -13,7 +13,7 @@ enum PaymentStatus: string
     {
         return match ($this) {
             self::PENDING => 'Pending',
-            self::SUCCESS => 'Success',
+            self::PAID => 'Paid',
             self::FAILED => 'Failed',
             self::REFUNDED => 'Refunded',
         };
@@ -23,7 +23,7 @@ enum PaymentStatus: string
     {
         return match ($this) {
             self::PENDING => 'warning',
-            self::SUCCESS => 'success',
+            self::PAID => 'success',
             self::FAILED => 'danger',
             self::REFUNDED => 'gray',
         };

@@ -28,7 +28,6 @@ class Plan extends Model
         'is_unlimited_whatsapp_numbers',
         'is_unlimited_campaigns',
         'is_unlimited_users',
-        'max_contacts'
     ];
 
     protected $casts = [

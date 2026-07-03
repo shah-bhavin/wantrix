@@ -21,6 +21,27 @@ class UsageLimit
         return $vendor->contacts()->count() < $plan->max_contacts;
     }
 
+
+    public static function canCreateCampaign(Vendor $vendor): bool
+    {
+        $plan = $vendor->activePlan();
+
+        if (!$plan) {
+            return false;
+        }
+
+        if ($plan->is_unlimited_campaigns) {
+            return true;
+        }
+
+        $count = $vendor->campaigns()
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+
+        return $count < $plan->max_campaigns_per_month;
+    }
+
     public static function canCreateUser(Vendor $vendor): bool
     {
         $plan = $vendor->activePlan();
@@ -50,4 +71,13 @@ class UsageLimit
 
         return $vendor->whatsappAccounts()->count() < $plan->max_whatsapp_numbers;
     }
+
+    public static function campaignsUsedThisMonth(Vendor $vendor): int
+    {
+        return $vendor->campaigns()
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+    }
+
 }

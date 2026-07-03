@@ -17,12 +17,17 @@ class CampaignShow extends Component
     public int $deliveredMessages = 0;
     public int $failedMessages = 0;
 
-    // public function mount(Campaign $campaign)
-    // {
-    //     $this->campaign = $campaign;
+    public function mount(Campaign $campaign): void
+    {
+        abort_unless(
+            $campaign->vendor_id === auth()->user()->vendor_id,
+            403
+        );
 
-    //     $this->loadStats();
-    // }
+        $this->campaign = $campaign;
+
+        $this->loadStats();
+    }
 
 
     public function sendCampaign(): void

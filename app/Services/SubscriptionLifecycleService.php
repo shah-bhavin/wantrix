@@ -1,4 +1,5 @@
 <?php 
+namespace App\Services;
 
 use App\Enums\SubscriptionStatus;
 use App\Models\Plan;

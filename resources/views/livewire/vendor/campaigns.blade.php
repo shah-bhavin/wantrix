@@ -38,6 +38,15 @@
                         <option value="{{ $template->id }}">{{ $template->name }}</option>
                     @endforeach
                 </select>
+                <select wire:model="whatsapp_account_id" class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
+                    <option value="">Select WhatsApp Number</option>
+                    @foreach($whatsappAccounts as $account)
+                        <option value="{{ $account->id }}">
+                            {{ $account->name }} ({{ $account->phone_number }})
+                        </option>
+                    @endforeach
+                </select>
+
                 <input type="datetime-local" wire:model="scheduled_at" class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
             </div>
 

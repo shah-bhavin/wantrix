@@ -54,8 +54,8 @@ class Subscription extends Model
         return self::query()
             ->where('vendor_id', $vendorId)
             ->whereIn('status', [
-                'trial',
-                'active',
+                SubscriptionStatus::TRIAL,
+                SubscriptionStatus::ACTIVE,
             ])
             ->exists();
     }

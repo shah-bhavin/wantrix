@@ -1,6 +1,8 @@
 <?php
+namespace App\Services;
 
 use App\Enums\PaymentStatus;
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;

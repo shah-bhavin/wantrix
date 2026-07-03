@@ -105,14 +105,17 @@ class Vendor extends Model
 
     public function activeSubscription()
     {
-        return $this->subscriptions()
-            ->where('status', 'active')
-            ->latest()
-            ->first();
+        return $this->hasOne(Subscription::class)
+            ->whereIn('status', [
+                \App\Enums\SubscriptionStatus::TRIAL,
+                \App\Enums\SubscriptionStatus::ACTIVE,
+            ])
+            ->latestOfMany();
     }
+
 
     public function activePlan()
     {
-        return $this->activeSubscription()?->plan;
+        return $this->activeSubscription?->plan;
     }
 }

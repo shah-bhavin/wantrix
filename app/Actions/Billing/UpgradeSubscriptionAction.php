@@ -9,8 +9,8 @@ class UpgradeSubscriptionAction
 {
     public function execute(Vendor $vendor, Plan $plan): array
     {
-        $subscription = $vendor->subscriptions()->where('status', 'active')->latest()->first();
-
+        //$subscription = $vendor->subscriptions()->where('status', ['trial', 'active'])->latest()->first();
+        $subscription = $vendor->activeSubscription;
         if (!$subscription) {
             throw new \Exception('No active subscription found.');
         }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Vendor;
 
+use App\Support\UsageLimit;
 use Livewire\Component;
 
 class WhatsappAccounts extends Component
@@ -20,9 +21,11 @@ class WhatsappAccounts extends Component
     protected function rules(): array
     {
         return [
-            'name' => ['required'],
+            'name' => ['required', 'min:2'],
             'phone_number' => ['required'],
             'provider' => ['required'],
+            'phone_number_id' => ['nullable'],
+            'access_token' => ['nullable'],
         ];
     }
 
@@ -31,7 +34,7 @@ class WhatsappAccounts extends Component
         $data = $this->validate();
 
         if ($this->editingId) {
-
+            
             auth()->user()
                 ->vendor
                 ->whatsappAccounts()
@@ -45,6 +48,10 @@ class WhatsappAccounts extends Component
                 ]);
 
         } else {
+            if (!UsageLimit::canCreateWhatsappAccount(auth()->user()->vendor)) {
+                session()->flash('error', 'WhatsApp account limit reached. Upgrade your plan.');
+                return;
+            }
 
             auth()->user()
                 ->vendor

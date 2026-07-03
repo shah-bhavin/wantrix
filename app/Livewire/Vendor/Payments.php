@@ -8,6 +8,7 @@ use Livewire\WithPagination;
 
 class Payments extends Component
 {
+    use WithPagination;
     public function render()
     {
         $vendor = auth()->user()->vendor;

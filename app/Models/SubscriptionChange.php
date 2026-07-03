@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SubscriptionChangeType;
 use Illuminate\Database\Eloquent\Model;
 
 class SubscriptionChange extends Model

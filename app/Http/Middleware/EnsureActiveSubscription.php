@@ -15,12 +15,14 @@ class EnsureActiveSubscription
      */
     public function handle(Request $request, Closure $next): Response
     {
-        //return $next($request);
-        $subscription = $vendor->activeSubscription;
+        $vendor = auth()->user()?->vendor;
+
+        $subscription = $vendor?->activeSubscription;
 
         if (! $subscription || ! $subscription->status->canAccessFeatures()) {
-            return redirect()->route('billing');
+            return redirect()->route('vendor.billing');
         }
 
+        return $next($request);
     }
 }

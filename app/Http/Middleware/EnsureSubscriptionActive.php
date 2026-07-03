@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\SubscriptionStatus;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,9 +22,12 @@ class EnsureSubscriptionActive
             return redirect()->route('vendor.billing')->with('error', 'No active subscription found.');
         }
 
-        if ($subscription->ends_at?->isPast()) {
-            return redirect()->route('vendor.billing')->with('error', 'Your subscription has expired.');
+        if ($subscription->status === SubscriptionStatus::ACTIVE && $subscription->ends_at?->isPast()) {
+            return redirect()
+                ->route('vendor.billing')
+                ->with('error', 'Your subscription has expired.');
         }
+
 
         return $next($request);
     }

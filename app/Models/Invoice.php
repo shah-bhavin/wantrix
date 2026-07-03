@@ -18,6 +18,7 @@ class Invoice extends Model
     ];
     protected $casts = [
         'issued_at' => 'datetime', // Or 'date'
+        'paid_at' => 'datetime',
     ];
 
     public function vendor()

@@ -9,8 +9,8 @@ class VendorBillingService
     public function getData(User $user): array
     {
         $vendor = $user->vendor;
-        //$subscription = $vendor?->activeSubscription;
-        $subscription = $vendor?->currentSubscription;
+        $subscription = $vendor?->activeSubscription;
+        //$subscription = $vendor?->currentSubscription;
         $plan = $subscription?->plan;
 
         return [

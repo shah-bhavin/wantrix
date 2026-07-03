@@ -29,11 +29,12 @@ class VendorObserver
             'status' => SubscriptionStatus::TRIAL,
 
             'starts_at' => now(),
+            'ends_at' => null,
 
             'trial_ends_at' => now()
                 ->addDays($plan->trial_days),
 
-            'created_by' => auth()->id() ?? $vendor->id, // Fallback to the vendor's own ID or a system ID
+            'created_by' => auth()->id() // Fallback to the vendor's own ID or a system ID
 
         ]);
     }

@@ -21,6 +21,7 @@ class WhatsappAccount extends Model
     ];
     protected $casts = [
         'connected_at' => 'datetime',
+        'access_token' => 'encrypted',
     ];
 
     public function vendor()

@@ -10,6 +10,7 @@ class Campaign extends Model
         'vendor_id',
         'group_id',
         'template_id',
+        'whatsapp_account_id',
         'name',
         'status',
         'scheduled_at',
@@ -41,5 +42,9 @@ class Campaign extends Model
     public function messages()
     {
         return $this->hasMany(Message::class);
+    }
+    public function whatsappAccount()
+    {
+        return $this->belongsTo(WhatsappAccount::class);
     }
 }

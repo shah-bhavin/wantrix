@@ -4,9 +4,11 @@ namespace App\Livewire\Vendor;
 
 use Livewire\Component;
 use App\Models\Invoice;
+use Livewire\WithPagination;
 
 class Invoices extends Component
 {
+    use WithPagination;
     public function render()
     {
         $vendor = auth()->user()->vendor;

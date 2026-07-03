@@ -26,6 +26,11 @@ class Contacts extends Component
 
     public array $selectedTags = [];
     
+    private function vendor()
+    {
+        return auth()->user()->vendor;
+    }
+
     protected function rules(): array
     {
         return [
@@ -121,7 +126,10 @@ class Contacts extends Component
     public function editContact(int $id): void
     {
         
-        $contact = Contact::findOrFail($id);
+        $contact = auth()->user()
+            ->vendor
+            ->contacts()
+            ->findOrFail($id);
         $this->selectedTags = $contact
             ->tags()
             ->pluck('tags.id')
@@ -138,9 +146,13 @@ class Contacts extends Component
     public function updateContact(): void
     {
         $data = $this->validate();
-        Contact::where('id', $this->editingContactId)->update($data);
+        $contact = auth()->user()
+            ->vendor
+            ->contacts()
+            ->findOrFail($this->editingContactId);
 
-        $contact = Contact::findOrFail($this->editingContactId);
+        $contact->update($data);
+
         $contact->tags()->sync($this->selectedTags);
 
         $this->showEditModal = false;
@@ -154,7 +166,12 @@ class Contacts extends Component
 
     public function deleteContact(): void
     {
-        Contact::where('id', $this->deletingContactId)->delete();
+        $contact = auth()->user()
+            ->vendor
+            ->contacts()
+            ->findOrFail($this->deletingContactId);
+
+        $contact->delete();
         $this->deletingContactId = null;
         session()->flash('success', 'Contact deleted successfully.');
     }
