@@ -3,9 +3,10 @@
 namespace App\Livewire\Vendor;
 
 use App\Actions\Contacts\CreateContactAction;
-use App\Models\Contact;
-use Livewire\Component;
 use App\Enums\ContactStatus;
+use App\Models\Contact;
+use App\Support\UsageLimit;
+use Livewire\Component;
 use Livewire\WithPagination;
 
 class Contacts extends Component
@@ -44,6 +45,12 @@ class Contacts extends Component
     public function createContact(): void
     {
         $data = $this->validate();
+
+        if (!UsageLimit::canCreateContact(auth()->user()->vendor)) {
+            session()->flash('error', 'Contact limit reached. Upgrade your plan.');
+            return;
+        }
+
 
         $contact = app(CreateContactAction::class)->execute(
             auth()->user()->vendor,

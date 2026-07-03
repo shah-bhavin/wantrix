@@ -7,6 +7,12 @@ use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
 
+    'meta' => [
+        'driver' => 'single',
+        'path' => storage_path('logs/meta.log'),
+        'level' => 'debug',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Default Log Channel

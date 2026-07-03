@@ -17,6 +17,9 @@ class Analytics extends Component
         $sentMessages = Message::where('vendor_id', $vendorId)->where('status', 'sent')->count();
         $failedMessages = Message::where('vendor_id', $vendorId)->where('status', 'failed')->count();
 
+        $deliveredMessages = Message::where('vendor_id', $vendorId)->where('status', 'delivered')->count();
+        $readMessages = Message::where('vendor_id', $vendorId)->where('status', 'read')->count();
+
         $recentCampaigns = Campaign::where('vendor_id', $vendorId)
             ->latest()
             ->take(5)

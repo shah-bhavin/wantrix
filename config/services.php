@@ -14,6 +14,11 @@ return [
     |
     */
 
+    'meta' => [
+        'verify_token' => env('META_VERIFY_TOKEN'),
+    ],
+
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

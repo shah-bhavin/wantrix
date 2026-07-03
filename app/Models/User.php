@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'avatar', 'password', 'status', 'avatar', ])]
+#[Fillable(['name', 'email', 'avatar', 'password', 'status', 'avatar', 'role', 'vendor_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -68,5 +68,20 @@ class User extends Authenticatable
         return $this->avatar
             ? asset('storage/' . $this->avatar)
             : null;
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role === 'manager';
+    }
+
+    public function isAgent(): bool
+    {
+        return $this->role === 'agent';
     }
 }

@@ -36,11 +36,16 @@ return [
         'icon' => 'chat-bubble-left-right',
         'route' => 'vendor.analytics',
     ],
-    // [
-    //     'label' => 'WhatsApp Accounts',
-    //     'icon' => 'device-phone-mobile',
-    //     'route' => 'vendor.whatsapp-accounts',
-    // ],
+    [
+        'label' => 'WhatsApp Accounts',
+        'icon' => 'device-phone-mobile',
+        'route' => 'vendor.whatsapp.accounts',
+    ],
+    [
+        'label' => 'Meta Setup',
+        'icon' => 'device-phone-mobile',
+        'route' => 'vendor.meta.setup',
+    ],
     [
         'label' => 'Billing',
         'icon' => 'credit-card',
@@ -55,6 +60,11 @@ return [
         'label' => 'Import Contacts',
         'route' => 'vendor.contacts.import',
         'icon' => 'arrow-up-tray',
+    ],
+    [
+        'label' => 'Team Members',
+        'route' => 'vendor.team-members',
+        'icon' => 'users',
     ],
     // [
     //     'label' => 'Settings',

@@ -103,4 +103,16 @@ class Vendor extends Model
         return $this->hasMany(Message::class);
     }
 
+    public function activeSubscription()
+    {
+        return $this->subscriptions()
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+    }
+
+    public function activePlan()
+    {
+        return $this->activeSubscription()?->plan;
+    }
 }
