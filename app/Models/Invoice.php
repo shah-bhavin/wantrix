@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
 use Illuminate\Database\Eloquent\Model;
 
 class Invoice extends Model
@@ -18,6 +19,7 @@ class Invoice extends Model
     ];
     protected $casts = [
         'issued_at' => 'datetime', // Or 'date'
+        'status' => InvoiceStatus::class,
         'paid_at' => 'datetime',
     ];
 

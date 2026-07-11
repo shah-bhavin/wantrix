@@ -17,7 +17,7 @@
                 </div>
 
                 <div class="text-2xl font-bold">
-                    {{ $campaign->messages()->count() }}
+                    {{ $totalMessages }}
                 </div>
             </div>
 
@@ -27,7 +27,7 @@
                 </div>
 
                 <div class="text-2xl font-bold text-amber-600">
-                    {{ $campaign->messages()->where('status','pending')->count() }}
+                    {{ $pendingMessages }}
                 </div>
             </div>
 
@@ -37,7 +37,7 @@
                 </div>
 
                 <div class="text-2xl font-bold text-blue-600">
-                    {{ $campaign->messages()->where('status','sent')->count() }}
+                    {{ $sentMessages }}
                 </div>
             </div>
 
@@ -47,7 +47,7 @@
                 </div>
 
                 <div class="text-2xl font-bold text-green-600">
-                    {{ $campaign->messages()->where('status','delivered')->count() }}
+                    {{ $deliveredMessages }}
                 </div>
             </div>
 
@@ -57,7 +57,7 @@
                 </div>
 
                 <div class="text-2xl font-bold text-red-600">
-                    {{ $campaign->messages()->where('status','failed')->count() }}
+                    {{ $failedMessages }}
                 </div>
             </div>
 
@@ -66,7 +66,7 @@
         <div class="grid md:grid-cols-2 gap-6 mt-8 text-sm">
             <div>
                 <div class="text-slate-500">Status</div>
-                <div class="font-semibold text-slate-900 mt-1">{{ ucfirst($campaign->status) }}</div>
+                <div class="font-semibold text-slate-900 mt-1">{{ ucfirst($campaign->status->label()) }}</div>
             </div>
 
             <div>

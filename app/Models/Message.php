@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\MessageStatus;
 use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
@@ -20,6 +21,7 @@ class Message extends Model
     ];
 
     protected $casts = [
+        'status' => MessageStatus::class,
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',

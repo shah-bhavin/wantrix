@@ -16,6 +16,6 @@ class Dashboard extends Component
 
     public function render()
     {
-        return view('livewire.vendor.dashboard')->layout('layouts.vendor');
+        return view('livewire.vendor.dashboard')->layout('layouts.vendor', ['title' => 'Dashboard']);
     }
 }

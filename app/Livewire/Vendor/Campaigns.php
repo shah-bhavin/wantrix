@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Vendor;
 
+use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Models\Group;
 use App\Models\Template;
@@ -40,8 +41,8 @@ class Campaigns extends Component
             'whatsapp_account_id' => $this->whatsapp_account_id,
             'name' => $this->name,
             'status' => $this->scheduled_at
-                ? 'scheduled'
-                : 'draft',
+                ? CampaignStatus::SCHEDULED
+                : CampaignStatus::DRAFT,
             'scheduled_at' => $this->scheduled_at,
         ]);
 

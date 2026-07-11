@@ -104,8 +104,8 @@
                         </td>
 
                         <td class="p-4">
-                            <span class="px-3 py-1 rounded-full text-xs font-medium {{ $colors[$campaign->status] ?? 'bg-slate-100 text-slate-700' }}">
-                                {{ ucfirst($campaign->status) }}
+                            <span class="px-3 py-1 rounded-full text-xs font-medium {{ $colors[$campaign->status->value] ?? 'bg-slate-100 text-slate-700' }}">
+                                {{ $campaign->status->label() }}
                             </span>
                         </td>
                         <td class="p-4">

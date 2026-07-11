@@ -12,7 +12,7 @@
 
         <x-vendor.stats-card title="Users" :value="$stats['current_users'].' / '.$stats['max_users']" :percentage="$stats['max_users'] ? ($stats['current_users'] / $stats['max_users']) * 100 : 0" />
 
-        <x-vendor.stats-card title="Contacts" :value="$stats['contacts_count'].' / '.$stats['max_contacts']" />
+        <x-vendor.stats-card title="Contacts" :value="$stats['contacts_count'].' / '.$stats['max_contacts']" :percentage="$stats['max_contacts'] ? ($stats['contacts_count'] / $stats['max_contacts']) * 100 : 0"/>
         
         <x-vendor.stats-card title="Subscription" :value="$stats['subscription_days_left'] . ' Days Left'" />
     </div>

@@ -81,10 +81,10 @@ class Contacts extends Component
     public function render()
     {
         $vendorId = auth()->user()->vendor->id;
-
         $tags = auth()->user()->vendor->tags()->orderBy('name')->get();
 
         $totalContacts = Contact::where('vendor_id', $vendorId)->count();
+        //echo '<pre>';print_r($tags);echo '</pre>';
 
         $activeContacts = Contact::where('vendor_id', $vendorId)
             ->where('status', ContactStatus::ACTIVE->value)

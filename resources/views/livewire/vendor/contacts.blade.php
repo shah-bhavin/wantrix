@@ -155,7 +155,7 @@
 
                 {{-- Action Buttons --}}
                 <div class="flex justify-end gap-3 mt-8">
-                    <button wire:click="$set('showCreateModal', false)"
+                    <button wire:click="$set('showEditModal', false)"
                         class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition">
                         Cancel
                     </button>

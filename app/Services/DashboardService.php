@@ -11,6 +11,7 @@ class DashboardService
         $vendor = $user->vendor;
         $subscription = $vendor?->activeSubscription;
         $plan = $subscription?->plan;
+        //echo '<pre>';print_r($plan);echo '</pre>';
 
         return [
             'plan_name' => $plan?->name ?? 'No Plan',

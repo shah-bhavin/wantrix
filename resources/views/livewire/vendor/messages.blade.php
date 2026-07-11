@@ -22,7 +22,7 @@
                         </td>
                         <td class="p-4">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                                {{ ucfirst($message->status) }}
+                                {{ str($message->status->value)->headline() }}
                             </span>
                         </td>
                         <td class="p-4 text-slate-500">

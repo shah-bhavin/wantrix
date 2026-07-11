@@ -4,6 +4,7 @@ namespace App\Livewire\Vendor;
 
 use App\Actions\Campaigns\DispatchCampaignAction;
 use App\Actions\Campaigns\GenerateCampaignMessagesAction;
+use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use Livewire\Component;
 
@@ -32,7 +33,7 @@ class CampaignShow extends Component
 
     public function sendCampaign(): void
     {
-        if ($this->campaign->status !== 'draft') {
+        if ($this->campaign->status !== CampaignStatus::DRAFT){
 
             $this->dispatch(
                 'notify',
@@ -44,7 +45,9 @@ class CampaignShow extends Component
 
         app(DispatchCampaignAction::class)
             ->execute($this->campaign);
-        
+        $this->loadStats();
+        $this->campaign->refresh();
+
         $this->dispatch(
             'notify',
             type: 'success',
@@ -65,8 +68,21 @@ class CampaignShow extends Component
             return;
         }       
 
-        app(GenerateCampaignMessagesAction::class)
-            ->execute($this->campaign);
+        try {
+            app(GenerateCampaignMessagesAction::class)->execute($this->campaign);
+        } catch (\Exception $e) {
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: $e->getMessage()
+            );
+            return;
+        }
+
+
+
+            $this->loadStats();
+            $this->campaign->refresh();
         
         $this->dispatch(
             'notify',
@@ -74,6 +90,7 @@ class CampaignShow extends Component
             message: 'Messages generated successfully.'
         );
     }
+    
 
     public function loadStats(): void 
     { 
