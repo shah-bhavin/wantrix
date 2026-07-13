@@ -2,16 +2,18 @@
 
     <div>
         @php
-        $page = \App\Support\Page::current();
+        $page = \App\Support\Navigation::current();
         @endphp
 
         <div>
-            <h2 class="font-semibold text-lg">
-                {{ data_get($page, 'page.heading', data_get($page, 'label')) }}
-            </h2>
+            <h1 class="text-2xl font-bold">
+                {{ \App\Support\Navigation::title() }}
+            </h1>
 
             @if(!empty($page['description']))
-                {{ data_get($page, 'page.description') }}
+                <p class="text-sm text-slate-500 mt-1">
+                    {{ \App\Support\Navigation::description() }}
+                </p>
             @endif
         </div>
     </div>

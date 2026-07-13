@@ -2,39 +2,51 @@
 
 return [
 
-     [
-        'label' => 'Dashboard',
+    //  [
+    //     'label' => 'Dashboard',
 
-        'route' => 'vendor.dashboard',
+    //     'route' => 'vendor.dashboard',
 
-        'icon' => 'home',
+    //     'icon' => 'home',
 
-        'page' => [
+    //     'page' => [
 
-            'title' => 'Dashboards',
+    //         'title' => 'Dashboards',
 
-            'heading' => 'Welcome Back',
+    //         'heading' => 'Welcome Back',
 
-            'description' => 'Overview of your WhatsApp Business',
+    //         'description' => 'Overview of your WhatsApp Business',
 
-            'browser_title' => 'Dashboard',
+    //         'browser_title' => 'Dashboard',
 
-            'seo' => [
-                'title' => 'Dashboard | Wantrix',
-                'description' => 'Manage your WhatsApp Business Dashboard.',
-                'keywords' => [
-                    'dashboard',
-                    'whatsapp',
-                    'wantrix',
-                ],
-            ],
+    //         'seo' => [
+    //             'title' => 'Dashboard | Wantrix',
+    //             'description' => 'Manage your WhatsApp Business Dashboard.',
+    //             'keywords' => [
+    //                 'dashboard',
+    //                 'whatsapp',
+    //                 'wantrix',
+    //             ],
+    //         ],
 
-            'social' => [
-                'title' => 'Wantrix Dashboard',
-                'description' => 'Manage campaigns, contacts and analytics.',
-                'image' => '/images/social/dashboard.png',
-            ],
-        ],
+    //         'social' => [
+    //             'title' => 'Wantrix Dashboard',
+    //             'description' => 'Manage campaigns, contacts and analytics.',
+    //             'image' => '/images/social/dashboard.png',
+    //         ],
+    //     ],
+    // ],
+
+    [
+        'label'=>'Dashboard',
+
+        'title'=>'Dashboard',
+
+        'description'=>'Overview of your WhatsApp business.',
+
+        'route'=>'vendor.dashboard',
+
+        'icon'=>'home',
     ],
 
     [
@@ -44,6 +56,8 @@ return [
 
             [
                 'label' => 'Contacts',
+                'title'=>'Contacts',
+                'description'=>'Manage all your customer contacts.',
                 'route' => 'vendor.contacts',
                 'icon' => 'users',
             ],
@@ -69,9 +83,11 @@ return [
         'children' => [
 
             [
-                'label' => 'Campaigns',
-                'route' => 'vendor.campaigns',
-                'icon' => 'megaphone',
+                'label'=>'Campaigns',
+                'title'=>'Campaigns',
+                'description'=>'Create and manage WhatsApp campaigns.',
+                'route'=>'vendor.campaigns',
+                'icon'=>'megaphone',
             ],
 
             [

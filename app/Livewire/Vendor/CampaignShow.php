@@ -6,19 +6,21 @@ use App\Actions\Campaigns\DispatchCampaignAction;
 use App\Actions\Campaigns\GenerateCampaignMessagesAction;
 use App\Enums\CampaignStatus;
 use App\Models\Campaign;
+use App\Services\CampaignStatisticsService;
+use App\Services\CampaignTimelineService;
 use Livewire\Component;
 
 class CampaignShow extends Component
 {
     public Campaign $campaign;
 
-    public int $totalMessages = 0;
-    public int $pendingMessages = 0;
-    public int $sentMessages = 0;
-    public int $deliveredMessages = 0;
-    public int $failedMessages = 0;
+    public array $stats = [];
+    public int $progress = 0;
+    public array $timeline = [];
 
-    public function mount(Campaign $campaign): void
+    protected CampaignStatisticsService $statistics;
+
+    public function mount(Campaign $campaign, CampaignStatisticsService $statistics): void
     {
         abort_unless(
             $campaign->vendor_id === auth()->user()->vendor_id,
@@ -26,8 +28,14 @@ class CampaignShow extends Component
         );
 
         $this->campaign = $campaign;
+        $this->statistics = $statistics;
+        $this->campaign->load([
+            'group.contacts',
+            'template',
+        ]);
 
         $this->loadStats();
+        $this->loadTimeline();
     }
 
 
@@ -90,17 +98,39 @@ class CampaignShow extends Component
             message: 'Messages generated successfully.'
         );
     }
-    
 
-    public function loadStats(): void 
-    { 
-        $this->campaign->refresh(); 
-        
-        $this->totalMessages = $this->campaign->messages()->count(); 
-        $this->pendingMessages = $this->campaign->messages()->where('status', 'pending')->count(); 
-        $this->sentMessages = $this->campaign->messages()->where('status', 'sent')->count(); 
-        $this->deliveredMessages = $this->campaign->messages()->where('status', 'delivered')->count(); 
-        $this->failedMessages = $this->campaign->messages()->where('status', 'failed')->count(); 
+    public function loadStats(): void
+    {
+        $this->campaign->refresh();
+
+        $this->stats = app(CampaignStatisticsService::class)
+            ->get($this->campaign);
+    }
+
+    public function loadTimeline(): void
+    {
+        $this->timeline = app(CampaignTimelineService::class)
+            ->get($this->campaign);
+    }
+
+    public function refreshCampaign(): void
+    {
+        $this->campaign->refresh();
+
+        $this->loadStats();
+
+        $this->loadTimeline();
+    }
+
+    public function shouldPoll(): bool
+    {
+        return in_array(
+            $this->campaign->status,
+            [
+                CampaignStatus::PROCESSING,
+                CampaignStatus::SCHEDULED,
+            ]
+        );
     }
 
     public function render()

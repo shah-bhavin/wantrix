@@ -9,7 +9,7 @@ $isActive = request()->routeIs(
     </div>
 
     <nav class="flex-1 p-4 space-y-2">
-    @foreach(config('navigation') as $item)
+    @foreach($navigation as $item)
         {{-- Normal Menu --}}
         @if(isset($item['route']))
             <a href="{{ route($item['route']) }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition {{ request()->routeIs($item['route']) ? 'bg-amber-50 text-amber-600 font-medium' : 'text-slate-600 hover:bg-slate-100' }}">

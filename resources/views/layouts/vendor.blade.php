@@ -5,10 +5,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     @php
-        $page = \App\Support\Page::current();
-        @endphp
+        $page = \App\Support\Navigation::current();
+    @endphp
     <title>
-        {{ data_get($page, 'page.browser_title', config('app.name')) }}
+        {{ $page['title'] ?? config('app.name') }}
+        |
+        {{ config('app.name') }}
     </title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])

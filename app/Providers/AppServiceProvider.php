@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Models\Vendor;
 use App\Observers\VendorObserver;
+use App\View\Composers\NavigationComposer;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,5 +24,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vendor::observe(VendorObserver::class);
+        View::composer(
+            [
+                'components.vendor.sidebar',
+                'components.vendor.navbar',
+                'layouts.vendor',
+            ],
+            NavigationComposer::class
+    );
     }
 }
