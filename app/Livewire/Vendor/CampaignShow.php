@@ -4,6 +4,8 @@ namespace App\Livewire\Vendor;
 
 use App\Actions\Campaigns\DispatchCampaignAction;
 use App\Actions\Campaigns\GenerateCampaignMessagesAction;
+use App\Actions\Campaigns\PauseCampaignAction;
+use App\Actions\Campaigns\ResumeCampaignAction;
 use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Services\CampaignStatisticsService;
@@ -63,7 +65,33 @@ class CampaignShow extends Component
         );
     }
 
+    public function pauseCampaign(): void
+    {
+        app(PauseCampaignAction::class)
+            ->execute($this->campaign);
 
+        $this->refreshCampaign();
+
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: 'Campaign paused.'
+        );
+    }
+
+    public function resumeCampaign(): void
+    {
+        app(ResumeCampaignAction::class)
+            ->execute($this->campaign);
+
+        $this->refreshCampaign();
+
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: 'Campaign resumed.'
+        );
+    }
     
     public function generateMessages(): void
     {     

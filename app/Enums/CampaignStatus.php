@@ -44,4 +44,77 @@ enum CampaignStatus: string
             self::CANCELLED => 'bg-slate-200 text-slate-700',
         };
     }
+
+    public function canDispatch(): bool
+    {
+        return $this === self::DRAFT;
+    }
+
+    public function canGenerateMessages(): bool
+    {
+        return $this === self::DRAFT;
+    }
+
+    public function canPause(): bool
+    {
+        return $this === self::PROCESSING;
+    }
+
+    public function canResume(): bool
+    {
+        return $this === self::PAUSED;
+    }
+
+    public function canCancel(): bool
+    {
+        return in_array($this, [
+            self::DRAFT,
+            self::SCHEDULED,
+            self::PROCESSING,
+            self::PAUSED,
+        ]);
+    }
+
+    public function isFinished(): bool
+    {
+        return in_array($this, [
+            self::COMPLETED,
+            self::FAILED,
+            self::CANCELLED,
+        ]);
+    }
+
+    public function isPaused(): bool
+    {
+        return $this === self::PAUSED;
+    }
+
+    public function isProcessing(): bool
+    {
+        return $this === self::PROCESSING;
+    }
+
+    public function nextStatuses(): array
+    {
+        return match ($this) {
+
+            self::DRAFT => [
+                self::PROCESSING,
+                self::CANCELLED,
+            ],
+
+            self::PROCESSING => [
+                self::COMPLETED,
+                self::FAILED,
+                self::PAUSED,
+            ],
+
+            self::PAUSED => [
+                self::PROCESSING,
+                self::CANCELLED,
+            ],
+
+            default => [],
+        };
+    }
 }

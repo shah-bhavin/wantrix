@@ -19,6 +19,17 @@ class ProcessMessageJob implements ShouldQueue
 
     public function handle(): void
     {
+        $campaign = $this->message->campaign;
+
+        if ($campaign->status->canPause()) {
+            //
+        }
+
+        if ($campaign->status->isPaused()) {
+            $this->release(30);
+            return;
+        }
+
         $this->message->update([
             'status' => MessageStatus::SENDING,
         ]);
