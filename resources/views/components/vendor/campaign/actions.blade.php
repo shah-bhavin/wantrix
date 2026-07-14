@@ -1,6 +1,6 @@
 <div class="flex flex-wrap items-center gap-3 mt-6">
 
-    <button wire:click="generateMessages" wire:loading.attr="disabled" @disabled($campaign->messages()->exists())
+    <button wire:click="generateMessages" wire:loading.attr="disabled" @disabled(! $campaign->canGenerateMessages())
         class="px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-medium disabled:opacity-50
         disabled:cursor-not-allowed">
 
@@ -8,8 +8,7 @@
 
     </button>
 
-    <button wire:click="sendCampaign" wire:loading.attr="disabled" @disabled($campaign->status !==
-        \App\Enums\CampaignStatus::DRAFT)
+    <button wire:click="sendCampaign" wire:loading.attr="disabled" @disabled(! $campaign->canSend())
         class="px-5 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50
         disabled:cursor-not-allowed">
 
@@ -17,13 +16,13 @@
 
     </button>
 
-    @if($campaign->status->canPause())
+    @if($campaign->canPause())
     <button wire:click="pauseCampaign" class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-xl">
         Pause
     </button>
     @endif
 
-    @if($campaign->status->canResume())
+    @if($campaign->canResume())
     <button wire:click="resumeCampaign" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl">
         Resume
     </button>

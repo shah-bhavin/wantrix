@@ -24,4 +24,17 @@ enum MessageStatus:string
             self::FAILED => 'Failed',
         };
     }
+
+    public function badgeColor(): string
+    {
+        return match ($this) {
+            self::PENDING => 'bg-amber-100 text-amber-700',
+            self::QUEUED => 'bg-yellow-100 text-yellow-700',
+            self::SENDING => 'bg-blue-100 text-blue-700',
+            self::SENT => 'bg-green-100 text-green-700',
+            self::DELIVERED => 'bg-emerald-100 text-emerald-700',
+            self::READ => 'bg-purple-100 text-purple-700',
+            self::FAILED => 'bg-red-100 text-red-700',
+        };
+    }
 }

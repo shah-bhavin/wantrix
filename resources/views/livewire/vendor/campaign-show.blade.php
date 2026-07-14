@@ -16,13 +16,108 @@
 
     <div class="bg-white rounded-3xl border border-slate-200 p-8">
         <x-vendor.campaign.header :campaign="$campaign" />
+        
+        
+        <div class="border-b mt-8 mb-8">
+
+            <nav class="flex gap-8">
+
+                <button
+                    wire:click="changeTab('overview')"
+                    @class([
+                        'pb-4 font-semibold border-b-2 transition',
+                        'border-amber-500 text-amber-600' => $tab === 'overview',
+                        'border-transparent text-slate-500 hover:text-slate-800' => $tab !== 'overview',
+                    ])>
+
+                    Overview
+
+                </button>
+
+                <button
+                    wire:click="changeTab('messages')"
+                    @class([
+                        'pb-4 font-semibold border-b-2 transition',
+                        'border-amber-500 text-amber-600' => $tab === 'messages',
+                        'border-transparent text-slate-500 hover:text-slate-800' => $tab !== 'messages',
+                    ])>
+
+                    Messages
+
+                </button>
+
+                <button
+                    wire:click="changeTab('analytics')"
+                    @class([
+                        'pb-4 font-semibold border-b-2 transition',
+                        'border-amber-500 text-amber-600' => $tab === 'analytics',
+                        'border-transparent text-slate-500 hover:text-slate-800' => $tab !== 'analytics',
+                    ])>
+
+                    Analytics
+
+                </button>
+
+                <button
+                    wire:click="changeTab('activity')"
+                    @class([
+                        'pb-4 font-semibold border-b-2 transition',
+                        'border-amber-500 text-amber-600' => $tab === 'activity',
+                        'border-transparent text-slate-500 hover:text-slate-800' => $tab !== 'activity',
+                    ])>
+
+                    Activity
+
+                </button>
+
+            </nav>
+
+        </div>
+
         <x-vendor.campaign.actions :campaign="$campaign" />
-        <x-vendor.campaign.dates :campaign="$campaign" />
-        <x-vendor.campaign.statistics :stats="$stats" />
-        <x-vendor.campaign.progress :stats="$stats" />
-        <x-vendor.campaign.rates :stats="$stats" />
-        <x-vendor.campaign.information :campaign="$campaign" />
-        <x-vendor.campaign.timeline :timeline="$timeline" />
+
+        @if($tab === 'overview')
+
+            <x-vendor.campaign.dates :campaign="$campaign" />
+
+            <x-vendor.campaign.statistics :stats="$stats" />
+
+            <x-vendor.campaign.progress :stats="$stats" />
+
+            <x-vendor.campaign.rates :stats="$stats" />
+
+            <x-vendor.campaign.information :campaign="$campaign" />
+
+        @endif
+
+
+        @if($tab === 'messages')
+
+            <livewire:vendor.campaign-messages
+                :campaign="$campaign"
+                :key="'messages-'.$campaign->id"
+            />
+
+        @endif
+
+
+        @if($tab === 'analytics')
+
+            Coming Soon
+
+        @endif
+
+
+        @if($tab === 'activity')
+
+            <x-vendor.campaign.timeline
+                :timeline="$timeline"
+            />
+
+        @endif
+
+
+        {{-- <livewire:vendor.message-drawer /> --}}
     </div>
 
 </div>

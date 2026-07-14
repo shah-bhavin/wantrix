@@ -15,6 +15,7 @@ use Livewire\Component;
 class CampaignShow extends Component
 {
     public Campaign $campaign;
+    public string $tab = 'overview';
 
     public array $stats = [];
     public int $progress = 0;
@@ -43,8 +44,7 @@ class CampaignShow extends Component
 
     public function sendCampaign(): void
     {
-        if ($this->campaign->status !== CampaignStatus::DRAFT){
-
+        if (! $this->campaign->canSend()) {
             $this->dispatch(
                 'notify',
                 type: 'error',
@@ -95,7 +95,7 @@ class CampaignShow extends Component
     
     public function generateMessages(): void
     {     
-        if ($this->campaign->messages()->exists()) {
+        if (! $this->campaign->canGenerateMessages()) {
             $this->dispatch(
                 'notify',
                 type: 'error',
@@ -159,6 +159,11 @@ class CampaignShow extends Component
                 CampaignStatus::SCHEDULED,
             ]
         );
+    }
+
+    public function changeTab(string $tab): void
+    {
+        $this->tab = $tab;
     }
 
     public function render()

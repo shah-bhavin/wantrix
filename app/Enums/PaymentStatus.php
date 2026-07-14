@@ -18,7 +18,7 @@ enum PaymentStatus: string
         };
     }
 
-    public function color(): string
+    public function badgeColor(): string
     {
         return match ($this) {
             self::PENDING => 'warning',
