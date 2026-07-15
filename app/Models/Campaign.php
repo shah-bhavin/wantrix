@@ -14,6 +14,7 @@ class Campaign extends Model
         'whatsapp_account_id',
         'name',
         'status',
+        'messages_generated_at',
         'scheduled_at',
         'started_at',
         'completed_at',
@@ -87,5 +88,15 @@ class Campaign extends Model
                 CampaignStatus::PAUSED,
             ]
         );
+    }
+    public function isReadyToComplete(): bool
+    {
+        return ! $this->messages()
+            ->whereIn('status', [
+                \App\Enums\MessageStatus::PENDING,
+                \App\Enums\MessageStatus::QUEUED,
+                \App\Enums\MessageStatus::SENDING,
+            ])
+            ->exists();
     }
 }

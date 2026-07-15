@@ -19,12 +19,14 @@ class CampaignDispatcherService
                 'status' => CampaignStatus::PROCESSING,
                 'started_at' => now(),
             ]);
-            
         });
-        
+
         $campaign
             ->messages()
+            ->where('status', MessageStatus::PENDING)
             ->chunkById(500, function ($messages) {
+                //$ids = $messages->modelKeys();
+
                 $ids = $messages->modelKeys();
 
                 Message::whereIn('id', $ids)
@@ -35,9 +37,7 @@ class CampaignDispatcherService
                 foreach ($messages as $message) {
 
                     $message->status = MessageStatus::QUEUED;
-
                     ProcessMessageJob::dispatch($message);
-
                 }
             });
     }

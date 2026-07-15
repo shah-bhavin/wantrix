@@ -10,6 +10,7 @@ use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Services\CampaignStatisticsService;
 use App\Services\CampaignTimelineService;
+use App\Services\CampaignWorkflowService;
 use Livewire\Component;
 
 class CampaignShow extends Component
@@ -44,19 +45,23 @@ class CampaignShow extends Component
 
     public function sendCampaign(): void
     {
+        $this->campaign->refresh();
+
         if (! $this->campaign->canSend()) {
+
             $this->dispatch(
                 'notify',
                 type: 'error',
                 message: 'Campaign already processed.'
             );
+
             return;
         }
 
         app(DispatchCampaignAction::class)
             ->execute($this->campaign);
-        $this->loadStats();
-        $this->campaign->refresh();
+
+        $this->refreshCampaign();
 
         $this->dispatch(
             'notify',
@@ -92,34 +97,31 @@ class CampaignShow extends Component
             message: 'Campaign resumed.'
         );
     }
-    
-    public function generateMessages(): void
-    {     
-        if (! $this->campaign->canGenerateMessages()) {
-            $this->dispatch(
-                'notify',
-                type: 'error',
-                message: 'Messages already generated.'
-            );
-            return;
-        }       
 
+    public function generateMessages(): void
+    {
         try {
-            app(GenerateCampaignMessagesAction::class)->execute($this->campaign);
+
+            app(CampaignWorkflowService::class)
+                ->generateMessages($this->campaign);
         } catch (\Exception $e) {
+
             $this->dispatch(
                 'notify',
                 type: 'error',
                 message: $e->getMessage()
             );
+
             return;
         }
 
+        //$this->refreshCampaign();
+        $this->campaign->refresh();
 
+        $this->loadStats();
 
-            $this->loadStats();
-            $this->campaign->refresh();
-        
+        $this->dispatch('$refresh');
+
         $this->dispatch(
             'notify',
             type: 'success',
@@ -170,5 +172,4 @@ class CampaignShow extends Component
     {
         return view('livewire.vendor.campaign-show')->layout('layouts.vendor');
     }
-
 }

@@ -2,9 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\MessageStatus;
+use App\Jobs\GenerateMessageChunkJob;
 use App\Models\Campaign;
-use App\Models\Message;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -18,46 +17,25 @@ class GenerateCampaignMessagesJob implements ShouldQueue
 
     public function handle(): void
     {
-        if ($this->campaign->messages_generated_at) {
-            return;
-        }
 
-        $this->campaign->load('template');
+        $campaign = $this->campaign->fresh([
+            'group.contacts',
+            'template',
+        ]);
 
-        $this->campaign
-            ->group
+        $campaign->group
             ->contacts()
-            ->chunkById(1000, function ($contacts) {
+            ->select('contacts.id')
+            ->chunkById(500, function ($contacts) use ($campaign) {
 
-                $rows = [];
-
-                foreach ($contacts as $contact) {
-
-                    $rows[] = [
-
-                        'vendor_id' => $this->campaign->vendor_id,
-
-                        'campaign_id' => $this->campaign->id,
-
-                        'contact_id' => $contact->id,
-
-                        'body' => $this->campaign->template->body,
-
-                        'status' => MessageStatus::PENDING,
-
-                        'created_at' => now(),
-
-                        'updated_at' => now(),
-
-                    ];
-                }
-
-                Message::insert($rows);
+                GenerateMessageChunkJob::dispatch(
+                    $campaign,
+                    $contacts->pluck('id')->all()
+                );
             });
-        $this->campaign->update([
 
+        $campaign->update([
             'messages_generated_at' => now(),
-
         ]);
     }
 }

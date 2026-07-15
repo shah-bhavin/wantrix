@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Models\Message;
+use App\Services\CampaignWorkflowService;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -50,21 +51,6 @@ class ProcessMessageJob implements ShouldQueue
         }
 
 
-        $campaign = $this->message->campaign;
-
-        $remaining = $campaign->messages()
-            ->whereIn('status', [
-                MessageStatus::PENDING,
-                MessageStatus::QUEUED,
-                MessageStatus::SENDING,
-            ])
-            ->count();
-
-        if ($remaining === 0) {
-            $campaign->update([
-                'status' => CampaignStatus::COMPLETED,
-                'completed_at' => now(),
-            ]);
-        }
+        app(CampaignWorkflowService::class)->complete($this->message->campaign);
     }
 }
