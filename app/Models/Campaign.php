@@ -3,7 +3,10 @@
 namespace App\Models;
 
 use App\Enums\CampaignStatus;
+use App\Models\CampaignActivity;
+use App\Services\MessageStatus;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Campaign extends Model
 {
@@ -18,6 +21,8 @@ class Campaign extends Model
         'scheduled_at',
         'started_at',
         'completed_at',
+        'cancelled_at',
+
     ];
 
     protected $casts = [
@@ -25,6 +30,7 @@ class Campaign extends Model
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'messages_generated_at' => 'datetime',
     ];
 
@@ -58,6 +64,11 @@ class Campaign extends Model
             && is_null($this->messages_generated_at);
     }
 
+    public function canDeleteMessages(): bool
+    {
+        return $this->status === CampaignStatus::DRAFT;
+    }
+
     public function canSend(): bool
     {
         return
@@ -73,8 +84,10 @@ class Campaign extends Model
 
     public function canResume(): bool
     {
-        return
-            $this->status === CampaignStatus::PAUSED;
+        return in_array($this->status, [
+            CampaignStatus::PAUSED,
+            CampaignStatus::CANCELLED,
+        ]);
     }
 
     public function canCancel(): bool
@@ -93,10 +106,14 @@ class Campaign extends Model
     {
         return ! $this->messages()
             ->whereIn('status', [
-                \App\Enums\MessageStatus::PENDING,
-                \App\Enums\MessageStatus::QUEUED,
-                \App\Enums\MessageStatus::SENDING,
+                MessageStatus::PENDING->value,
+                MessageStatus::QUEUED->value,
+                MessageStatus::SENDING->value,
             ])
             ->exists();
+    }
+    public function activities(): HasMany
+    {
+        return $this->hasMany(CampaignActivity::class);
     }
 }

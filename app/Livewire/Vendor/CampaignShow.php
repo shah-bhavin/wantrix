@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Vendor;
 
+use App\Actions\Campaigns\CancelCampaignAction;
 use App\Actions\Campaigns\DispatchCampaignAction;
 use App\Actions\Campaigns\GenerateCampaignMessagesAction;
 use App\Actions\Campaigns\PauseCampaignAction;
@@ -41,7 +42,6 @@ class CampaignShow extends Component
         $this->loadStats();
         $this->loadTimeline();
     }
-
 
     public function sendCampaign(): void
     {
@@ -95,6 +95,20 @@ class CampaignShow extends Component
             'notify',
             type: 'success',
             message: 'Campaign resumed.'
+        );
+    }
+
+    public function cancelCampaign(): void
+    {
+        app(CancelCampaignAction::class)
+            ->execute($this->campaign);
+
+        $this->refreshCampaign();
+
+        $this->dispatch(
+            'notify',
+            type: 'success',
+            message: 'Campaign cancelled.'
         );
     }
 

@@ -1,4 +1,4 @@
-<div wire:poll.2s="loadStats">
+<div>
 
     <x-vendor.campaign.dates
         :campaign="$campaign"

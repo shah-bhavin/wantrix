@@ -151,8 +151,7 @@
 
                 <tr>
 
-                    <td colspan="5" class="p-10 text-center text-slate-400">
-
+                    <td colspan="6" class="p-10 text-center text-slate-400">
                         No messages found.
 
                     </td>

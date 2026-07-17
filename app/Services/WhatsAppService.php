@@ -8,14 +8,12 @@ class WhatsAppService
 {
     public function send(Message $message): array
     {
-        /*
-         |--------------------------------------------------------------------------
-         | Fake Response
-         |--------------------------------------------------------------------------
-         |
-         | Later this method will call Meta API.
-         |
-         */
+        if ($message->id % 3 === 0) {
+            return [
+                'success' => false,
+                'error' => 'Simulated provider failure.',
+            ];
+        }
 
         return [
             'success' => true,

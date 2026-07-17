@@ -8,10 +8,10 @@ use Illuminate\Queue\SerializesModels;
 
 class CampaignMessagesGenerated
 {
-    use Dispatchable;
-    use SerializesModels;
+    use Dispatchable, SerializesModels;
 
     public function __construct(
-        public Campaign $campaign,
-    ) {}
+        public Campaign $campaign
+    ) {
+    }
 }

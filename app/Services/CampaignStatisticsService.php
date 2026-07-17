@@ -14,37 +14,48 @@ class CampaignStatisticsService
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        // Total Messages
         $total = $counts->sum();
 
-        // Individual Counts
-        $pending = $counts[MessageStatus::PENDING->value] ?? 0;
-        $queued = $counts[MessageStatus::QUEUED->value] ?? 0;
-        $sending = $counts[MessageStatus::SENDING->value] ?? 0;
-        $sent = $counts[MessageStatus::SENT->value] ?? 0;
-        $delivered = $counts[MessageStatus::DELIVERED->value] ?? 0;
-        $read = $counts[MessageStatus::READ->value] ?? 0;
-        $failed = $counts[MessageStatus::FAILED->value] ?? 0;
+        $pending = (int) ($counts[MessageStatus::PENDING->value] ?? 0);
+        $queued = (int) ($counts[MessageStatus::QUEUED->value] ?? 0);
+        $sending = (int) ($counts[MessageStatus::SENDING->value] ?? 0);
+        $sent = (int) ($counts[MessageStatus::SENT->value] ?? 0);
+        $delivered = (int) ($counts[MessageStatus::DELIVERED->value] ?? 0);
+        $read = (int) ($counts[MessageStatus::READ->value] ?? 0);
+        $failed = (int) ($counts[MessageStatus::FAILED->value] ?? 0);
 
         /*
         |--------------------------------------------------------------------------
-        | Campaign Progress
+        | Message Processing
         |--------------------------------------------------------------------------
-        |
-        | A campaign is considered finished when every message reaches
-        | its final state.
-        |
-        | For now we consider:
-        | READ + FAILED
-        |
-        | Later, when Meta Webhooks are integrated, READ will become
-        | the final successful state.
-        |
         */
 
-        $completed = $read + $failed;
+        $processed = $sent
+            + $delivered
+            + $read
+            + $failed;
+
+        $active = $pending
+            + $queued
+            + $sending;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success Metrics
+        |--------------------------------------------------------------------------
+        */
+
+        $successful = $sent
+            + $delivered
+            + $read;
 
         return [
+
+            /*
+            |--------------------------------------------------------------------------
+            | Counts
+            |--------------------------------------------------------------------------
+            */
 
             'total' => $total,
 
@@ -62,22 +73,73 @@ class CampaignStatisticsService
 
             'failed' => $failed,
 
-            // Overall campaign completion %
+            'processed' => $processed,
+
+            'active' => $active,
+
+            'successful' => $successful,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Campaign Progress
+            |--------------------------------------------------------------------------
+            |
+            | A message is processed once it reaches a final state.
+            |
+            | SENT, DELIVERED, READ and FAILED are all final states
+            | for the current system.
+            |
+            */
+
             'progress' => $total > 0
-                ? round(($completed / $total) * 100)
+                ? round(($processed / $total) * 100)
                 : 0,
 
-            // How many messages were successfully sent?
+            /*
+            |--------------------------------------------------------------------------
+            | Success Rate
+            |--------------------------------------------------------------------------
+            |
+            | Successfully processed messages compared to total messages.
+            |
+            */
+
             'success_rate' => $total > 0
-                ? round(($sent / $total) * 100)
+                ? round(($successful / $total) * 100)
                 : 0,
 
-            // Of sent messages, how many got delivered?
+            /*
+            |--------------------------------------------------------------------------
+            | Failure Rate
+            |--------------------------------------------------------------------------
+            */
+
+            'failure_rate' => $total > 0
+                ? round(($failed / $total) * 100)
+                : 0,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Delivery Rate
+            |--------------------------------------------------------------------------
+            |
+            | Sent messages that were delivered.
+            |
+            */
+
             'delivery_rate' => $sent > 0
                 ? round(($delivered / $sent) * 100)
                 : 0,
 
-            // Of delivered messages, how many were read?
+            /*
+            |--------------------------------------------------------------------------
+            | Read Rate
+            |--------------------------------------------------------------------------
+            |
+            | Delivered messages that were read.
+            |
+            */
+
             'read_rate' => $delivered > 0
                 ? round(($read / $delivered) * 100)
                 : 0,

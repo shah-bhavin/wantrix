@@ -4,29 +4,30 @@ namespace App\Actions\Campaigns;
 
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
-use App\Events\CampaignResumed;
-use App\Jobs\ProcessMessageJob;
+use App\Events\CampaignCancelled;
 use App\Models\Campaign;
 
-class ResumeCampaignAction
+class CancelCampaignAction
 {
     public function execute(Campaign $campaign): void
     {
         $campaign->refresh();
 
-        if (! $campaign->status->canResume()) {
+        if (! $campaign->status->canCancel()) {
             return;
         }
 
         $updated = $campaign->newQuery()
             ->whereKey($campaign->id)
             ->whereIn('status', [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+                CampaignStatus::PROCESSING,
                 CampaignStatus::PAUSED,
-                CampaignStatus::CANCELLED,
             ])
             ->update([
-                'status' => CampaignStatus::PROCESSING,
-                'completed_at' => null,
+                'status' => CampaignStatus::CANCELLED,
+                'cancelled_at' => now(),
             ]);
 
         if ($updated !== 1) {
@@ -35,18 +36,17 @@ class ResumeCampaignAction
 
         $campaign->refresh();
 
-        event(new CampaignResumed($campaign));
-
         $campaign->messages()
             ->whereIn('status', [
-                MessageStatus::QUEUED,
                 MessageStatus::PENDING,
+                MessageStatus::QUEUED,
+                MessageStatus::SENDING,
             ])
-            ->chunkById(500, function ($messages) {
+            ->update([
+                'status' => MessageStatus::FAILED,
+                'failure_reason' => 'Campaign was cancelled before message was sent.',
+            ]);
 
-                foreach ($messages as $message) {
-                    ProcessMessageJob::dispatch($message);
-                }
-            });
+        event(new CampaignCancelled($campaign));
     }
 }

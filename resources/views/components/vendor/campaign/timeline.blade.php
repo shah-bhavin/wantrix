@@ -12,6 +12,7 @@
                                 'bg-amber-100 text-amber-600' => $activity['color'] == 'amber',
                                 'bg-green-100 text-green-600' => $activity['color'] == 'green',
                                 'bg-emerald-100 text-emerald-600' => $activity['color'] == 'emerald',
+                                'bg-red-100 text-red-600' => $activity['color'] == 'red',
                             ])">
                     <x-dynamic-component :component="'heroicon-o-'.$activity['icon']" class="w-5 h-5" />
                 </div>

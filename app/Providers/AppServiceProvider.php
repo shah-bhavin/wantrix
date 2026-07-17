@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\Campaign;
 use App\Models\Vendor;
+use App\Observers\CampaignObserver;
 use App\Observers\VendorObserver;
 use App\View\Composers\NavigationComposer;
 use Illuminate\Support\Facades\View;
@@ -15,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vendor::observe(VendorObserver::class);
-
+        Campaign::observe(CampaignObserver::class);
         View::composer(
             [
                 'components.vendor.sidebar',

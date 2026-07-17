@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
+use App\Events\CampaignStarted;
 use App\Jobs\ProcessMessageJob;
 use App\Models\Campaign;
 use App\Models\Message;
@@ -19,6 +20,10 @@ class CampaignDispatcherService
                 'status' => CampaignStatus::PROCESSING,
                 'started_at' => now(),
             ]);
+
+            event(new CampaignStarted(
+                $campaign->fresh()
+            ));
         });
 
         $campaign

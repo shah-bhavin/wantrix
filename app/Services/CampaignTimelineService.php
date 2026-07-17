@@ -8,69 +8,48 @@ class CampaignTimelineService
 {
     public function get(Campaign $campaign): array
     {
-        $timeline = [];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Campaign Created
-        |--------------------------------------------------------------------------
-        */
-        $timeline[] = [
-            'title' => 'Campaign Created',
-            'description' => 'Campaign was created.',
-            'time' => $campaign->created_at,
-            'icon' => 'plus-circle',
-            'color' => 'blue',
-        ];
-
-        /*
-        |--------------------------------------------------------------------------
-        | Messages Generated
-        |--------------------------------------------------------------------------
-        */
-        if ($campaign->messages()->exists()) {
-            $timeline[] = [
-                'title' => 'Messages Generated',
-                'description' => $campaign->messages()->count().' messages generated.',
-                'time' => $campaign->messages()->oldest()->first()->created_at,
-                'icon' => 'chat-bubble-left-right',
-                'color' => 'amber',
-            ];
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Campaign Started
-        |--------------------------------------------------------------------------
-        */
-        if ($campaign->started_at) {
-            $timeline[] = [
-                'title' => 'Campaign Started',
-                'description' => 'Campaign processing started.',
-                'time' => $campaign->started_at,
-                'icon' => 'play',
-                'color' => 'green',
-            ];
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Campaign Completed
-        |--------------------------------------------------------------------------
-        */
-        if ($campaign->completed_at) {
-            $timeline[] = [
-                'title' => 'Campaign Completed',
-                'description' => 'Campaign finished.',
-                'time' => $campaign->completed_at,
-                'icon' => 'check-circle',
-                'color' => 'emerald',
-            ];
-        }
-
-        return collect($timeline)
-            ->sortByDesc('time')
+        return $campaign->activities()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'title' => $activity->type->label(),
+                    'description' => $activity->description,
+                    'time' => $activity->created_at,
+                    'icon' => $this->icon($activity->type),
+                    'color' => $this->color($activity->type),
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    private function icon($type): string
+    {
+        return match ($type->value) {
+            'created' => 'plus-circle',
+            'messages_generated' => 'chat-bubble-left-right',
+            'started' => 'play',
+            'paused' => 'pause',
+            'resumed' => 'play',
+            'completed' => 'check-circle',
+            'cancelled' => 'x-circle',
+            default => 'information-circle',
+        };
+    }
+
+    private function color($type): string
+    {
+        return match ($type->value) {
+            'created' => 'blue',
+            'messages_generated' => 'amber',
+            'started' => 'green',
+            'paused' => 'amber',
+            'resumed' => 'green',
+            'completed' => 'emerald',
+            'cancelled' => 'red',
+            default => 'blue',
+        };
     }
 }

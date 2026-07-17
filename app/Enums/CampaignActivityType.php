@@ -11,6 +11,7 @@ enum CampaignActivityType: string
     case RESUMED = 'resumed';
     case COMPLETED = 'completed';
     case CANCELLED = 'cancelled';
+    case MESSAGES_RETRIED = 'messages_retried';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum CampaignActivityType: string
             self::RESUMED => 'Campaign Resumed',
             self::COMPLETED => 'Campaign Completed',
             self::CANCELLED => 'Campaign Cancelled',
+            self::MESSAGES_RETRIED => 'Messages Retried',
         };
     }
 }

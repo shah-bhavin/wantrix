@@ -1,6 +1,6 @@
 <div class="max-w-6xl mx-auto" @if($this->shouldPoll()) wire:poll.2s="refreshCampaign" @endif>
 
-    <div wire:loading.flex wire:target="generateMessages,sendCampaign,pauseCampaign,resumeCampaign"
+    <div wire:loading.flex wire:target="generateMessages,sendCampaign,pauseCampaign,resumeCampaign,cancelCampaign"
         class="fixed inset-0 bg-black/20 backdrop-blur-sm items-center justify-center z-50">
         <div class="bg-white rounded-2xl px-8 py-6 shadow-xl">
             <svg class="animate-spin h-8 w-8 mx-auto text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none"

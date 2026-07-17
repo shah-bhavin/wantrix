@@ -28,4 +28,13 @@
     </button>
     @endif
 
+    @if($campaign->status->canCancel())
+
+    <button wire:click="cancelCampaign" wire:confirm="Are you sure you want to cancel this campaign?"
+        class="px-4 py-2 rounded-xl bg-red-100 text-red-700 hover:bg-red-200 transition">
+        Cancel Campaign
+    </button>
+
+    @endif
+
 </div>

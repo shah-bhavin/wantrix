@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
+    public const MAX_RETRIES = 3;
     protected $fillable = [
         'vendor_id',
         'campaign_id',
@@ -18,6 +19,8 @@ class Message extends Model
         'delivered_at',
         'read_at',
         'failure_reason',
+        'retry_count',
+        'last_retried_at',
     ];
 
     protected $casts = [
@@ -25,6 +28,7 @@ class Message extends Model
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
         'read_at' => 'datetime',
+        'last_retried_at' => 'datetime',
     ];
 
     public function vendor()
@@ -40,5 +44,10 @@ class Message extends Model
     public function contact()
     {
         return $this->belongsTo(Contact::class);
+    }
+    public function canRetry(): bool
+    {
+        return $this->status === MessageStatus::FAILED
+            && $this->retry_count < 3;
     }
 }

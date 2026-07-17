@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-enum MessageStatus:string
+enum MessageStatus: string
 {
     case PENDING = 'pending';
     case QUEUED = 'queued';
@@ -11,6 +11,7 @@ enum MessageStatus:string
     case DELIVERED = 'delivered';
     case READ = 'read';
     case FAILED = 'failed';
+    case MESSAGES_RETRIED = 'messages_retried';
 
     public function label(): string
     {
@@ -22,6 +23,7 @@ enum MessageStatus:string
             self::DELIVERED => 'Delivered',
             self::READ => 'Read',
             self::FAILED => 'Failed',
+            self::MESSAGES_RETRIED => 'Messages Retried',
         };
     }
 
@@ -36,5 +38,33 @@ enum MessageStatus:string
             self::READ => 'bg-purple-100 text-purple-700',
             self::FAILED => 'bg-red-100 text-red-700',
         };
+    }
+
+    public function isFinal(): bool
+    {
+        return in_array($this, [
+            self::SENT,
+            self::DELIVERED,
+            self::READ,
+            self::FAILED,
+        ], true);
+    }
+
+    public function isSuccessful(): bool
+    {
+        return in_array($this, [
+            self::SENT,
+            self::DELIVERED,
+            self::READ,
+        ], true);
+    }
+
+    public function isPending(): bool
+    {
+        return in_array($this, [
+            self::PENDING,
+            self::QUEUED,
+            self::SENDING,
+        ], true);
     }
 }

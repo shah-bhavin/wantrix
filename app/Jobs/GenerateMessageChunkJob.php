@@ -4,21 +4,25 @@ namespace App\Jobs;
 
 use App\Enums\MessageStatus;
 use App\Models\Campaign;
+use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 class GenerateMessageChunkJob implements ShouldQueue
 {
-    use Queueable;
+    use Batchable, Queueable;
 
     public function __construct(
         public Campaign $campaign,
         public array $contactIds,
-    ) {}
+    ) {
+    }
 
     public function handle(): void
     {
-
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
 
         $contacts = $this->campaign
             ->group
@@ -26,9 +30,7 @@ class GenerateMessageChunkJob implements ShouldQueue
             ->whereIn('contacts.id', $this->contactIds)
             ->get();
 
-
         foreach ($contacts as $contact) {
-
             $this->campaign
                 ->messages()
                 ->create([

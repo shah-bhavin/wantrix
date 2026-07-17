@@ -3,19 +3,19 @@
 namespace App\Listeners\Campaigns;
 
 use App\Enums\CampaignActivityType;
-use App\Events\CampaignCompleted;
+use App\Events\CampaignCancelled;
 use App\Models\CampaignActivity;
 
-class RecordCampaignCompletedActivity
+class RecordCampaignCancelledActivity
 {
-    public function handle(CampaignCompleted $event): void
+    public function handle(CampaignCancelled $event): void
     {
         $campaign = $event->campaign;
 
         CampaignActivity::create([
             'campaign_id' => $campaign->id,
-            'type' => CampaignActivityType::COMPLETED,
-            'description' => 'Campaign finished successfully.',
+            'type' => CampaignActivityType::CANCELLED,
+            'description' => 'Campaign was cancelled.',
         ]);
     }
 }
