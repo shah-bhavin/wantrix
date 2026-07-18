@@ -12,3 +12,7 @@ Artisan::command('inspire', function () {
 Schedule::command(
     ExpireSubscriptionsCommand::class
 )->daily();
+// Process scheduled campaigns every minute
+Schedule::command(
+    'app:process-scheduled-campaigns'
+)->everyMinute();

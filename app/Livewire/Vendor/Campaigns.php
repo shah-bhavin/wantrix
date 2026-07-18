@@ -17,6 +17,7 @@ class Campaigns extends Component
     public string $template_id = '';
     public string $whatsapp_account_id = '';
     public ?string $scheduled_at = null;
+    public int $message_delay_seconds = 0;
 
     public function createCampaign(): void
     {
@@ -25,7 +26,17 @@ class Campaigns extends Component
             'group_id' => ['required'],
             'template_id' => ['required'],
             'whatsapp_account_id' => ['required'],
-            'scheduled_at' => ['nullable'],
+            'scheduled_at' => [
+                'nullable',
+                'date',
+                'after:now',
+            ],
+            'message_delay_seconds' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:3600',
+            ],
         ]);
 
         if (!UsageLimit::canCreateCampaign(auth()->user()->vendor)) {
@@ -44,6 +55,7 @@ class Campaigns extends Component
                 ? CampaignStatus::SCHEDULED
                 : CampaignStatus::DRAFT,
             'scheduled_at' => $this->scheduled_at,
+            'message_delay_seconds' => $this->message_delay_seconds,
         ]);
 
         $this->reset(['name', 'group_id', 'template_id', 'whatsapp_account_id']);

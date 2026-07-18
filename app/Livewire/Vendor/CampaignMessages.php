@@ -9,6 +9,7 @@ use App\Models\Campaign;
 use App\Services\CampaignWorkflowService;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Models\CampaignActivity;
 
 class CampaignMessages extends Component
 {
@@ -141,6 +142,12 @@ class CampaignMessages extends Component
 
             return;
         }
+
+        CampaignActivity::create([
+            'campaign_id' => $this->campaign->id,
+            'type' => 'messages_retried',
+            'description' => "{$count} message(s) queued for retry.",
+        ]);
 
         $this->selected = [];
 

@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
 use App\Models\CampaignActivity;
-use App\Services\MessageStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -18,11 +18,11 @@ class Campaign extends Model
         'name',
         'status',
         'messages_generated_at',
+        'message_delay_seconds',
         'scheduled_at',
         'started_at',
         'completed_at',
         'cancelled_at',
-
     ];
 
     protected $casts = [

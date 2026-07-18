@@ -120,6 +120,8 @@ class CampaignWorkflowService
         array $messageIds
     ): int {
 
+        $campaign->refresh();
+
         $messages = $campaign->messages()
             ->whereIn('id', $messageIds)
             ->where('status', MessageStatus::FAILED)
@@ -130,6 +132,26 @@ class CampaignWorkflowService
             return 0;
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Reopen Completed Campaign
+    |--------------------------------------------------------------------------
+    */
+
+        if ($campaign->status === CampaignStatus::COMPLETED) {
+
+            $campaign->update([
+                'status' => CampaignStatus::PROCESSING,
+                'completed_at' => null,
+            ]);
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Queue Failed Messages
+    |--------------------------------------------------------------------------
+    */
+
         foreach ($messages as $message) {
 
             $message->update([
@@ -138,6 +160,8 @@ class CampaignWorkflowService
                 'retry_count' => $message->retry_count + 1,
                 'last_retried_at' => now(),
             ]);
+
+            ProcessMessageJob::dispatch($message);
         }
 
         return $messages->count();

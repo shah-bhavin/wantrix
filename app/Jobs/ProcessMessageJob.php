@@ -7,15 +7,21 @@ use App\Enums\MessageStatus;
 use App\Models\Message;
 use App\Services\CampaignWorkflowService;
 use App\Services\WhatsAppService;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ProcessMessageJob implements ShouldQueue
+class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
 {
     use Queueable, InteractsWithQueue, SerializesModels;
 
+    public bool $deleteWhenMissingModels = true;
+    public function uniqueId(): string
+    {
+        return 'message-' . $this->message->id;
+    }
     public function __construct(
         public Message $message
     ) {}
@@ -138,9 +144,7 @@ class ProcessMessageJob implements ShouldQueue
         |--------------------------------------------------------------------------
         | Failed Message
         |--------------------------------------------------------------------------
-        */
-
-        else {
+        */ else {
 
             $this->message->update([
                 'status' => MessageStatus::FAILED,

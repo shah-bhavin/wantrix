@@ -87,13 +87,10 @@
 
         @if($tab === 'activity')
 
-        <x-vendor.campaign.timeline :timeline="$timeline" />
+        <livewire:vendor.campaign-activity :campaign="$campaign" />
 
         @endif
 
-
-        {{--
-        <livewire:vendor.message-drawer /> --}}
     </div>
 
 </div>

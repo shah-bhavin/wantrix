@@ -11,7 +11,6 @@ enum MessageStatus: string
     case DELIVERED = 'delivered';
     case READ = 'read';
     case FAILED = 'failed';
-    case MESSAGES_RETRIED = 'messages_retried';
 
     public function label(): string
     {
@@ -23,7 +22,6 @@ enum MessageStatus: string
             self::DELIVERED => 'Delivered',
             self::READ => 'Read',
             self::FAILED => 'Failed',
-            self::MESSAGES_RETRIED => 'Messages Retried',
         };
     }
 

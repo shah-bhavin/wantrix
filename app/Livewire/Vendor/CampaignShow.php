@@ -4,13 +4,11 @@ namespace App\Livewire\Vendor;
 
 use App\Actions\Campaigns\CancelCampaignAction;
 use App\Actions\Campaigns\DispatchCampaignAction;
-use App\Actions\Campaigns\GenerateCampaignMessagesAction;
 use App\Actions\Campaigns\PauseCampaignAction;
 use App\Actions\Campaigns\ResumeCampaignAction;
 use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Services\CampaignStatisticsService;
-use App\Services\CampaignTimelineService;
 use App\Services\CampaignWorkflowService;
 use Livewire\Component;
 
@@ -21,7 +19,6 @@ class CampaignShow extends Component
 
     public array $stats = [];
     public int $progress = 0;
-    public array $timeline = [];
 
     protected CampaignStatisticsService $statistics;
 
@@ -40,7 +37,6 @@ class CampaignShow extends Component
         ]);
 
         $this->loadStats();
-        $this->loadTimeline();
     }
 
     public function sendCampaign(): void
@@ -151,19 +147,11 @@ class CampaignShow extends Component
             ->get($this->campaign);
     }
 
-    public function loadTimeline(): void
-    {
-        $this->timeline = app(CampaignTimelineService::class)
-            ->get($this->campaign);
-    }
-
     public function refreshCampaign(): void
     {
         $this->campaign->refresh();
 
         $this->loadStats();
-
-        $this->loadTimeline();
     }
 
     public function shouldPoll(): bool

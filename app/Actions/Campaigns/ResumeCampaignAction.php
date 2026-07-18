@@ -20,10 +20,7 @@ class ResumeCampaignAction
 
         $updated = $campaign->newQuery()
             ->whereKey($campaign->id)
-            ->whereIn('status', [
-                CampaignStatus::PAUSED,
-                CampaignStatus::CANCELLED,
-            ])
+            ->where('status', CampaignStatus::PAUSED)
             ->update([
                 'status' => CampaignStatus::PROCESSING,
                 'completed_at' => null,
@@ -37,15 +34,24 @@ class ResumeCampaignAction
 
         event(new CampaignResumed($campaign));
 
-        $campaign->messages()
+        $delay = 0;
+
+        $campaign
+            ->messages()
             ->whereIn('status', [
                 MessageStatus::QUEUED,
                 MessageStatus::PENDING,
             ])
-            ->chunkById(500, function ($messages) {
+            ->chunkById(500, function ($messages) use ($campaign, &$delay) {
 
                 foreach ($messages as $message) {
-                    ProcessMessageJob::dispatch($message);
+
+                    ProcessMessageJob::dispatch($message)
+                        ->delay(
+                            now()->addSeconds($delay)
+                        );
+
+                    $delay += $campaign->message_delay_seconds;
                 }
             });
     }

@@ -7,7 +7,6 @@ use App\Enums\MessageStatus;
 use App\Events\CampaignStarted;
 use App\Jobs\ProcessMessageJob;
 use App\Models\Campaign;
-use App\Models\Message;
 use Illuminate\Support\Facades\DB;
 
 class CampaignDispatcherService
@@ -19,6 +18,8 @@ class CampaignDispatcherService
             $campaign->update([
                 'status' => CampaignStatus::PROCESSING,
                 'started_at' => now(),
+                'completed_at' => null,
+                'cancelled_at' => null,
             ]);
 
             event(new CampaignStarted(
@@ -26,23 +27,25 @@ class CampaignDispatcherService
             ));
         });
 
+        $delay = 0;
+
         $campaign
             ->messages()
             ->where('status', MessageStatus::PENDING)
-            ->chunkById(500, function ($messages) {
-                //$ids = $messages->modelKeys();
-
-                $ids = $messages->modelKeys();
-
-                Message::whereIn('id', $ids)
-                    ->update([
-                        'status' => MessageStatus::QUEUED,
-                    ]);
+            ->chunkById(500, function ($messages) use ($campaign, &$delay) {
 
                 foreach ($messages as $message) {
 
-                    $message->status = MessageStatus::QUEUED;
-                    ProcessMessageJob::dispatch($message);
+                    $message->update([
+                        'status' => MessageStatus::QUEUED,
+                    ]);
+
+                    ProcessMessageJob::dispatch($message)
+                        ->delay(
+                            now()->addSeconds($delay)
+                        );
+
+                    $delay += $campaign->message_delay_seconds;
                 }
             });
     }
