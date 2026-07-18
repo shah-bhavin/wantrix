@@ -78,7 +78,8 @@
                     @enderror
                 </div>
 
-                <input type="datetime-local" wire:model="scheduled_at" min="{{ now()->format('Y-m-d\TH:i') }}" class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
+                <input type="datetime-local" wire:model="scheduled_at" min="{{ now()->format('Y-m-d\TH:i') }}"
+                    class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
             </div>
 
             <div class="flex justify-end gap-3 mt-8">
@@ -156,7 +157,5 @@
             </tbody>
         </table>
     </div>
-
-
-
+    
 </div>

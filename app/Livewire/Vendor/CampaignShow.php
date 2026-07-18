@@ -54,8 +54,7 @@ class CampaignShow extends Component
             return;
         }
 
-        app(DispatchCampaignAction::class)
-            ->execute($this->campaign);
+        app(DispatchCampaignAction::class)->execute($this->campaign);
 
         $this->refreshCampaign();
 
@@ -111,11 +110,8 @@ class CampaignShow extends Component
     public function generateMessages(): void
     {
         try {
-
-            app(CampaignWorkflowService::class)
-                ->generateMessages($this->campaign);
+            app(CampaignWorkflowService::class)->generateMessages($this->campaign);
         } catch (\Exception $e) {
-
             $this->dispatch(
                 'notify',
                 type: 'error',
@@ -125,13 +121,9 @@ class CampaignShow extends Component
             return;
         }
 
-        //$this->refreshCampaign();
         $this->campaign->refresh();
-
         $this->loadStats();
-
         $this->dispatch('$refresh');
-
         $this->dispatch(
             'notify',
             type: 'success',

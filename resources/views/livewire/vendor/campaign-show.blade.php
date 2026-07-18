@@ -17,6 +17,7 @@
     <div class="bg-white rounded-3xl border border-slate-200 p-8">
         <x-vendor.campaign.header :campaign="$campaign" />
 
+        <x-vendor.campaign.actions :campaign="$campaign" />
 
         <div class="border-b mt-8 mb-8">
 
@@ -62,7 +63,6 @@
 
         </div>
 
-        <x-vendor.campaign.actions :campaign="$campaign" />
 
         @if($tab === 'overview')
 

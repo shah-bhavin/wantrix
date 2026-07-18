@@ -13,19 +13,9 @@ class CampaignDispatcherService
 {
     public function dispatch(Campaign $campaign): void
     {
-        DB::transaction(function () use ($campaign) {
-
-            $campaign->update([
-                'status' => CampaignStatus::PROCESSING,
-                'started_at' => now(),
-                'completed_at' => null,
-                'cancelled_at' => null,
-            ]);
-
-            event(new CampaignStarted(
-                $campaign->fresh()
-            ));
-        });
+        event(new CampaignStarted(
+            $campaign->fresh()
+        ));
 
         $delay = 0;
 

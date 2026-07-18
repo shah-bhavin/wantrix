@@ -1,24 +1,5 @@
 <div>
 
-    {{-- Header --}}
-    {{-- <div class="flex items-center justify-between mb-6">
-
-        <div>
-
-            <h2 class="text-2xl font-bold">
-                Campaign Messages
-            </h2>
-
-            <p class="text-slate-500">
-
-                {{ $campaign->name }}
-
-            </p>
-
-        </div>
-
-    </div> --}}
-
     <x-vendor.filter-bar :status="true" :statuses="\App\Enums\MessageStatus::cases()" :total="$this->total" />
 
     @if(!empty($selected))
@@ -51,6 +32,7 @@
 
     @endif
     {{-- Table --}}
+    
     <div class="bg-white rounded-2xl border overflow-hidden">
 
         <table class="min-w-full">
