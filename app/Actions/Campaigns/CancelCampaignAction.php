@@ -6,9 +6,15 @@ use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Events\CampaignCancelled;
 use App\Models\Campaign;
+use App\Services\MessageStatusService;
+
 
 class CancelCampaignAction
 {
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+    
     public function execute(Campaign $campaign): void
     {
         $campaign->refresh();
@@ -36,16 +42,26 @@ class CancelCampaignAction
 
         $campaign->refresh();
 
-        $campaign->messages()
+        $messages = $campaign
+            ->messages()
             ->whereIn('status', [
                 MessageStatus::PENDING,
                 MessageStatus::QUEUED,
                 MessageStatus::SENDING,
             ])
-            ->update([
-                'status' => MessageStatus::FAILED,
-                'failure_reason' => 'Campaign was cancelled before message was sent.',
-            ]);
+            ->get();
+
+        foreach ($messages as $message) {
+
+            $this->statusService->change(
+                $message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
+        }
 
         event(new CampaignCancelled($campaign));
     }

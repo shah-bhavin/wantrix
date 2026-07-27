@@ -62,10 +62,7 @@ enum CampaignStatus: string
 
     public function canResume(): bool
     {
-        return in_array($this, [
-            self::PAUSED,
-            self::CANCELLED,
-        ]);
+        return $this === self::PAUSED;
     }
 
     public function canCancel(): bool

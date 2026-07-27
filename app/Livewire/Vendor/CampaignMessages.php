@@ -3,7 +3,6 @@
 namespace App\Livewire\Vendor;
 
 use App\Enums\MessageStatus;
-use App\Jobs\ProcessMessageJob;
 use App\Livewire\Concerns\WithDataTable;
 use App\Models\Campaign;
 use App\Services\CampaignWorkflowService;
@@ -107,11 +106,13 @@ class CampaignMessages extends Component
     {
         $this->campaign->refresh();
 
-        if ($this->campaign->status->isFinished()) {
+        if (
+            $this->campaign->status === \App\Enums\CampaignStatus::CANCELLED
+        ) {
             $this->dispatch(
                 'notify',
                 type: 'error',
-                message: 'Messages cannot be retried because this campaign is already finished.'
+                message: 'Messages cannot be retried because this campaign is cancelled.'
             );
 
             return;

@@ -19,6 +19,7 @@ class ProcessScheduledCampaigns extends Command
         $campaigns = Campaign::query()
             ->where('status', CampaignStatus::SCHEDULED)
             ->whereNotNull('scheduled_at')
+            ->whereNotNull('messages_generated_at')
             ->where('scheduled_at', '<=', now())
             ->get();
 

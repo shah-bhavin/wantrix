@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\MessageStatus;
+use App\Models\MessageStatusHistory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Message extends Model
 {
@@ -49,5 +51,10 @@ class Message extends Model
     {
         return $this->status === MessageStatus::FAILED
             && $this->retry_count < 3;
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(MessageStatusHistory::class);
     }
 }

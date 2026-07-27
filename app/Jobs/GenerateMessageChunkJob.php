@@ -16,6 +16,7 @@ class GenerateMessageChunkJob implements ShouldQueue
         public Campaign $campaign,
         public array $contactIds,
     ) {
+        $this->onQueue('campaign-generation');
     }
 
     public function handle(): void
@@ -31,7 +32,7 @@ class GenerateMessageChunkJob implements ShouldQueue
             ->get();
 
         foreach ($contacts as $contact) {
-            $this->campaign
+            $message = $this->campaign
                 ->messages()
                 ->create([
                     'vendor_id' => $this->campaign->vendor_id,
@@ -39,6 +40,11 @@ class GenerateMessageChunkJob implements ShouldQueue
                     'body' => $this->campaign->template->body,
                     'status' => MessageStatus::PENDING,
                 ]);
+
+            $message->statusHistories()->create([
+                'status' => MessageStatus::PENDING,
+                'changed_at' => now(),
+            ]);
         }
     }
 }

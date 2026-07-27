@@ -22,6 +22,17 @@ class DispatchCampaignAction
             return false;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Must Have Messages
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->messages()->doesntExist()) {
+            return false;
+        }
+
         /*
         |--------------------------------------------------------------------------
         | Atomic State Protection

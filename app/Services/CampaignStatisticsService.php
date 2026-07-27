@@ -14,6 +14,10 @@ class CampaignStatisticsService
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        $retryStats = $campaign->messages()
+            ->selectRaw('COUNT(CASE WHEN retry_count > 0 THEN 1 END) as retried_messages,
+                    COALESCE(SUM(retry_count), 0) as total_retry_attempts')->first();
+
         $total = $counts->sum();
 
         $pending = (int) ($counts[MessageStatus::PENDING->value] ?? 0);
@@ -49,6 +53,18 @@ class CampaignStatisticsService
             + $delivered
             + $read;
 
+        $sentFunnel = $sent
+            + $delivered
+            + $read;
+
+        $deliveredFunnel = $delivered
+            + $read;
+
+        $readFunnel = $read;
+
+        $retriedMessages = (int) $retryStats->retried_messages;
+        $totalRetryAttempts = (int) $retryStats->total_retry_attempts;
+
         return [
 
             /*
@@ -78,6 +94,20 @@ class CampaignStatisticsService
             'active' => $active,
 
             'successful' => $successful,
+
+            'retried_messages' => $retriedMessages,
+
+            'total_retry_attempts' => $totalRetryAttempts,
+
+            'retry_rate' => $total > 0
+                ? round(($retriedMessages / $total) * 100)
+                : 0,
+
+            'sent_funnel' => $sentFunnel,
+
+            'delivered_funnel' => $deliveredFunnel,
+
+            'read_funnel' => $readFunnel,
 
             /*
             |--------------------------------------------------------------------------

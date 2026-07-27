@@ -7,9 +7,15 @@ use App\Enums\MessageStatus;
 use App\Events\CampaignResumed;
 use App\Jobs\ProcessMessageJob;
 use App\Models\Campaign;
+use App\Services\MessageStatusService;
 
 class ResumeCampaignAction
 {
+    //public function execute(Campaign $campaign): void {
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+
     public function execute(Campaign $campaign): void
     {
         $campaign->refresh();
@@ -42,9 +48,23 @@ class ResumeCampaignAction
                 MessageStatus::QUEUED,
                 MessageStatus::PENDING,
             ])
-            ->chunkById(500, function ($messages) use ($campaign, &$delay) {
+            ->chunkById(500, function ($messages) use (
+                $campaign,
+                &$delay
+            ) {
 
                 foreach ($messages as $message) {
+
+                    /*
+            |--------------------------------------------------------------------------
+            | Pending Messages Become Queued
+            |--------------------------------------------------------------------------
+            */
+
+                    $this->statusService->change(
+                        $message,
+                        MessageStatus::QUEUED
+                    );
 
                     ProcessMessageJob::dispatch($message)
                         ->delay(

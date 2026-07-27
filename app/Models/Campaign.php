@@ -102,6 +102,13 @@ class Campaign extends Model
             ]
         );
     }
+    public function canBeProcessed(): bool
+    {
+        return
+            $this->status === CampaignStatus::SCHEDULED
+            && $this->messages_generated_at !== null
+            && $this->messages()->exists();
+    }
     public function isReadyToComplete(): bool
     {
         return ! $this->messages()

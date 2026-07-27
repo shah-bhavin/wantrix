@@ -12,6 +12,10 @@ use App\Models\Campaign;
 
 class CampaignWorkflowService
 {
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+
     public function generateMessages(Campaign $campaign): void
     {
         if (! $campaign->canGenerateMessages()) {
@@ -154,12 +158,15 @@ class CampaignWorkflowService
 
         foreach ($messages as $message) {
 
-            $message->update([
-                'status' => MessageStatus::QUEUED,
-                'failure_reason' => null,
-                'retry_count' => $message->retry_count + 1,
-                'last_retried_at' => now(),
-            ]);
+            $this->statusService->change(
+                $message,
+                MessageStatus::QUEUED,
+                [
+                    'failure_reason' => null,
+                    'retry_count' => $message->retry_count + 1,
+                    'last_retried_at' => now(),
+                ]
+            );
 
             ProcessMessageJob::dispatch($message);
         }

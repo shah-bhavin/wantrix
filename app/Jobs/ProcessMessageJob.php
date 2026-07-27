@@ -6,6 +6,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Models\Message;
 use App\Services\CampaignWorkflowService;
+use App\Services\MessageStatusService;
 use App\Services\WhatsAppService;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,31 +19,29 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
     use Queueable, InteractsWithQueue, SerializesModels;
 
     public bool $deleteWhenMissingModels = true;
+    public int $tries = 3;
+    public array $backoff = [10, 30, 60];
+    public bool $failOnTimeout = true;
+    public int $timeout = 120;
+
     public function uniqueId(): string
     {
         return 'message-' . $this->message->id;
     }
+
     public function __construct(
         public Message $message
-    ) {}
+    ) {
+        $this->onQueue('messages');
+    }
 
     public function handle(
         WhatsAppService $whatsapp,
-        CampaignWorkflowService $workflow
+        CampaignWorkflowService $workflow,
+        MessageStatusService $statusService
     ): void {
-        /*
-        |--------------------------------------------------------------------------
-        | Reload Message
-        |--------------------------------------------------------------------------
-        */
 
         $this->message->refresh();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load Campaign
-        |--------------------------------------------------------------------------
-        */
 
         $campaign = $this->message->campaign;
 
@@ -60,10 +59,14 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
 
         if ($campaign->status === CampaignStatus::CANCELLED) {
 
-            $this->message->update([
-                'status' => MessageStatus::FAILED,
-                'failure_reason' => 'Campaign was cancelled before message was sent.',
-            ]);
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
 
             return;
         }
@@ -75,6 +78,11 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         */
 
         if ($campaign->status === CampaignStatus::PAUSED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::QUEUED
+            );
 
             $this->release(30);
 
@@ -107,14 +115,51 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
 
         /*
         |--------------------------------------------------------------------------
-        | Mark Message As Sending
+        | Mark As Sending
         |--------------------------------------------------------------------------
         */
 
-        $this->message->update([
-            'status' => MessageStatus::SENDING,
-            'failure_reason' => null,
-        ]);
+        $statusService->change(
+            $this->message,
+            MessageStatus::SENDING,
+            [
+                'failure_reason' => null,
+            ]
+        );
+
+        /*
+|--------------------------------------------------------------------------
+| Re-check Campaign Before Sending
+|--------------------------------------------------------------------------
+*/
+
+        $campaign->refresh();
+
+        if ($campaign->status === CampaignStatus::CANCELLED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
+
+            return;
+        }
+
+        if ($campaign->status === CampaignStatus::PAUSED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::QUEUED
+            );
+
+            $this->release(30);
+
+            return;
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -132,12 +177,15 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
 
         if ($response['success']) {
 
-            $this->message->update([
-                'status' => MessageStatus::SENT,
-                'sent_at' => now(),
-                'provider_message_id' => $response['message_id'],
-                'failure_reason' => null,
-            ]);
+            $statusService->change(
+                $this->message,
+                MessageStatus::SENT,
+                [
+                    'sent_at' => now(),
+                    'provider_message_id' => $response['message_id'],
+                    'failure_reason' => null,
+                ]
+            );
         }
 
         /*
@@ -146,11 +194,14 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         |--------------------------------------------------------------------------
         */ else {
 
-            $this->message->update([
-                'status' => MessageStatus::FAILED,
-                'failure_reason' => $response['error']
-                    ?? 'Message failed to send.',
-            ]);
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' => $response['error']
+                        ?? 'Message failed to send.',
+                ]
+            );
         }
 
         /*
@@ -161,6 +212,21 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
 
         $workflow->complete(
             $campaign->fresh()
+        );
+    }
+    public function retryUntil(): \DateTime
+    {
+        return now()->addMinutes(5);
+    }
+    public function failed(\Throwable $exception): void
+    {
+        app(MessageStatusService::class)->change(
+            $this->message,
+            MessageStatus::FAILED,
+            [
+                'failure_reason' => $exception->getMessage()
+                    ?: 'Message processing failed unexpectedly.',
+            ]
         );
     }
 }

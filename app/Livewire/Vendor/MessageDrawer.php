@@ -19,9 +19,11 @@ class MessageDrawer extends Component
             'contact',
             'campaign.group',
             'campaign.template',
+            'statusHistories' => fn($query) =>
+            $query->orderBy('changed_at'),
         ])
-        ->where('vendor_id', auth()->user()->vendor_id)
-        ->findOrFail($id);
+            ->where('vendor_id', auth()->user()->vendor_id)
+            ->findOrFail($id);
 
         $this->open = true;
     }

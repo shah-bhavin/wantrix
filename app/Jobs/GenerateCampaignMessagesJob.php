@@ -18,6 +18,7 @@ class GenerateCampaignMessagesJob implements ShouldQueue
     public function __construct(
         public Campaign $campaign
     ) {
+        $this->onQueue('campaign-generation');
     }
 
     public function handle(): void
@@ -34,10 +35,10 @@ class GenerateCampaignMessagesJob implements ShouldQueue
             ->select('contacts.id')
             ->chunkById(500, function ($contacts) use (&$jobs, $campaign) {
 
-                $jobs[] = new GenerateMessageChunkJob(
+                $jobs[] = (new GenerateMessageChunkJob(
                     $campaign,
                     $contacts->pluck('id')->all()
-                );
+                ))->onQueue('campaign-generation');
             });
 
         if (empty($jobs)) {
@@ -51,6 +52,7 @@ class GenerateCampaignMessagesJob implements ShouldQueue
         }
 
         Bus::batch($jobs)
+            ->onQueue('campaign-generation')
             ->then(function (Batch $batch) use ($campaign) {
 
                 $campaign->update([
