@@ -8,12 +8,12 @@ use App\Models\Campaign;
 
 class PauseCampaignAction
 {
-    public function execute(Campaign $campaign): void
+    public function execute(Campaign $campaign): bool
     {
         $campaign->refresh();
 
         if (! $campaign->status->canPause()) {
-            return;
+            return false;
         }
 
         $updated = $campaign->newQuery()
@@ -23,10 +23,14 @@ class PauseCampaignAction
                 'status' => CampaignStatus::PAUSED,
             ]);
 
-        if ($updated === 1) {
-            event(new CampaignPaused(
-                $campaign->fresh()
-            ));
+        if ($updated !== 1) {
+            return false;
         }
+
+        event(new CampaignPaused(
+            $campaign->fresh()
+        ));
+
+        return true;
     }
 }

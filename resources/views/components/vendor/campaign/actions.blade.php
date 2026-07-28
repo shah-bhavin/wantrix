@@ -17,20 +17,20 @@
     </button>
 
     @if($campaign->canPause())
-    <button wire:click="pauseCampaign" class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-xl">
+    <button wire:click="pauseCampaign" wire:loading.attr="disabled" wire:target="pauseCampaign" class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-xl">
         Pause
     </button>
     @endif
 
     @if($campaign->canResume())
-    <button wire:click="resumeCampaign" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl">
+    <button  wire:click="resumeCampaign" wire:loading.attr="disabled" wire:target="resumeCampaign" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl">
         Resume
     </button>
     @endif
 
     @if($campaign->status->canCancel())
 
-    <button wire:click="cancelCampaign" wire:confirm="Are you sure you want to cancel this campaign?"
+    <button wire:click="cancelCampaign" wire:loading.attr="disabled" wire:target="cancelCampaign" wire:confirm="Are you sure you want to cancel this campaign?"
         class="px-4 py-2 rounded-xl bg-red-100 text-red-700 hover:bg-red-200 transition">
         Cancel Campaign
     </button>

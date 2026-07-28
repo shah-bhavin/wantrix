@@ -18,7 +18,7 @@ class DispatchCampaignAction
         |--------------------------------------------------------------------------
         */
 
-        if ($campaign->status !== CampaignStatus::SCHEDULED) {
+        if ($campaign->status !== CampaignStatus::DRAFT) {
             return false;
         }
 
@@ -41,7 +41,7 @@ class DispatchCampaignAction
 
         $updated = $campaign->newQuery()
             ->whereKey($campaign->id)
-            ->where('status', CampaignStatus::SCHEDULED)
+            ->where('status', CampaignStatus::DRAFT)
             ->update([
                 'status' => CampaignStatus::PROCESSING,
                 'started_at' => now(),

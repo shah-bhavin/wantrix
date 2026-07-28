@@ -67,43 +67,76 @@ class CampaignShow extends Component
 
     public function pauseCampaign(): void
     {
-        app(PauseCampaignAction::class)
+        $success = app(PauseCampaignAction::class)
             ->execute($this->campaign);
 
         $this->refreshCampaign();
 
+        if (! $success) {
+
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: 'Unable to pause campaign.'
+            );
+
+            return;
+        }
+
         $this->dispatch(
             'notify',
             type: 'success',
-            message: 'Campaign paused.'
+            message: 'Campaign paused successfully.'
         );
     }
 
     public function resumeCampaign(): void
     {
-        app(ResumeCampaignAction::class)
+        $success = app(ResumeCampaignAction::class)
             ->execute($this->campaign);
 
         $this->refreshCampaign();
 
+        if (! $success) {
+
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: 'Unable to resume campaign.'
+            );
+
+            return;
+        }
+
         $this->dispatch(
             'notify',
             type: 'success',
-            message: 'Campaign resumed.'
+            message: 'Campaign resumed successfully.'
         );
     }
 
     public function cancelCampaign(): void
     {
-        app(CancelCampaignAction::class)
+        $success = app(CancelCampaignAction::class)
             ->execute($this->campaign);
 
         $this->refreshCampaign();
 
+        if (! $success) {
+
+            $this->dispatch(
+                'notify',
+                type: 'error',
+                message: 'Unable to cancel campaign.'
+            );
+
+            return;
+        }
+
         $this->dispatch(
             'notify',
             type: 'success',
-            message: 'Campaign cancelled.'
+            message: 'Campaign cancelled successfully.'
         );
     }
 
@@ -121,9 +154,14 @@ class CampaignShow extends Component
             return;
         }
 
-        $this->campaign->refresh();
+        $this->campaign = $this->campaign->fresh([
+            'group',
+            'template',
+            'messages',
+        ]);
+        
         $this->loadStats();
-        $this->dispatch('$refresh');
+
         $this->dispatch(
             'notify',
             type: 'success',
@@ -148,13 +186,14 @@ class CampaignShow extends Component
 
     public function shouldPoll(): bool
     {
-        return in_array(
-            $this->campaign->status,
-            [
-                CampaignStatus::PROCESSING,
-                CampaignStatus::SCHEDULED,
-            ]
-        );
+        return (
+                $this->campaign->status === CampaignStatus::DRAFT
+                && $this->campaign->messages()->doesntExist()
+            )
+            ||
+            $this->campaign->status === CampaignStatus::PROCESSING
+            ||
+            $this->campaign->status === CampaignStatus::PAUSED;
     }
 
     public function changeTab(string $tab): void
@@ -164,6 +203,12 @@ class CampaignShow extends Component
 
     public function render()
     {
-        return view('livewire.vendor.campaign-show')->layout('layouts.vendor');
+        $this->campaign = Campaign::with([
+            'group',
+            'template',
+        ])->find($this->campaign->id);
+
+        return view('livewire.vendor.campaign-show')
+            ->layout('layouts.vendor');
     }
 }

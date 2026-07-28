@@ -47,7 +47,10 @@ enum CampaignStatus: string
 
     public function canDispatch(): bool
     {
-        return $this === self::DRAFT;
+        return in_array($this, [
+            self::DRAFT,
+            self::SCHEDULED,
+        ], true);
     }
 
     public function canGenerateMessages(): bool

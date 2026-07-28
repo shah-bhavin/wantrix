@@ -16,12 +16,12 @@ class ResumeCampaignAction
         protected MessageStatusService $statusService
     ) {}
 
-    public function execute(Campaign $campaign): void
+    public function execute(Campaign $campaign): bool
     {
         $campaign->refresh();
 
         if (! $campaign->status->canResume()) {
-            return;
+            return false;
         }
 
         $updated = $campaign->newQuery()
@@ -33,7 +33,7 @@ class ResumeCampaignAction
             ]);
 
         if ($updated !== 1) {
-            return;
+            return false;
         }
 
         $campaign->refresh();
@@ -67,6 +67,7 @@ class ResumeCampaignAction
                     );
 
                     ProcessMessageJob::dispatch($message)
+                        ->onQueue('messages')
                         ->delay(
                             now()->addSeconds($delay)
                         );
@@ -74,5 +75,6 @@ class ResumeCampaignAction
                     $delay += $campaign->message_delay_seconds;
                 }
             });
+        return true;
     }
 }

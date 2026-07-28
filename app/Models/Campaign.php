@@ -61,7 +61,7 @@ class Campaign extends Model
     {
         return
             $this->status === CampaignStatus::DRAFT
-            && is_null($this->messages_generated_at);
+            && ! $this->messages()->exists();
     }
 
     public function canDeleteMessages(): bool
@@ -72,8 +72,8 @@ class Campaign extends Model
     public function canSend(): bool
     {
         return
-            $this->status === CampaignStatus::DRAFT
-            && $this->messages_generated_at !== null;
+            $this->status->canDispatch()
+            && $this->messages()->exists();
     }
 
     public function canPause(): bool
@@ -105,7 +105,7 @@ class Campaign extends Model
     public function canBeProcessed(): bool
     {
         return
-            $this->status === CampaignStatus::SCHEDULED
+            $this->status === CampaignStatus::DRAFT
             && $this->messages_generated_at !== null
             && $this->messages()->exists();
     }

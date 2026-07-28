@@ -15,12 +15,12 @@ class CancelCampaignAction
         protected MessageStatusService $statusService
     ) {}
     
-    public function execute(Campaign $campaign): void
+    public function execute(Campaign $campaign): bool
     {
         $campaign->refresh();
 
         if (! $campaign->status->canCancel()) {
-            return;
+            return false;
         }
 
         $updated = $campaign->newQuery()
@@ -37,7 +37,7 @@ class CancelCampaignAction
             ]);
 
         if ($updated !== 1) {
-            return;
+            return false;
         }
 
         $campaign->refresh();
@@ -64,5 +64,6 @@ class CancelCampaignAction
         }
 
         event(new CampaignCancelled($campaign));
+        return true;
     }
 }
