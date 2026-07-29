@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VendorStatus;
+use App\Models\WhatsappTemplate;
 use App\Observers\VendorObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
@@ -117,5 +118,9 @@ class Vendor extends Model
     public function activePlan()
     {
         return $this->activeSubscription?->plan;
+    }
+    public function whatsappTemplates()
+    {
+        return $this->hasMany(WhatsappTemplate::class);
     }
 }

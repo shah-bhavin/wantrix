@@ -18,9 +18,20 @@ class WhatsappAccount extends Model
         'access_token',
         'is_active',
         'business_id',
+        'display_phone_number',
+        'verified_name',
+        'webhook_verify_token',
+        'metadata',
+        'quality_rating',
+        'verification_status',
+        'last_verified_at',
+        'last_error',
     ];
     protected $casts = [
         'connected_at' => 'datetime',
+        'last_verified_at' => 'datetime',
+        'metadata' => 'array',
+        'is_active' => 'boolean',
         'access_token' => 'encrypted',
     ];
 
