@@ -2,32 +2,45 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\WebhookLog;
 use Illuminate\Http\Request;
-use Log;
 
 class MetaWebhookController extends Controller
 {
     public function verify(Request $request)
     {
-        $verifyToken = config('services.meta.verify_token');
+        $mode = $request->get('hub_mode');
+        $token = $request->get('hub_verify_token');
+        $challenge = $request->get('hub_challenge');
 
-        if ($request->get('hub_verify_token') === $verifyToken) {
-            return response($request->get('hub_challenge'), 200);
+        if (
+            $mode === 'subscribe' &&
+            $token === config('meta.webhook_verify_token')
+        ) {
+            return response($challenge, 200);
         }
 
-        return response('Invalid verify token.', 403);
+        return response('Forbidden', 403);
     }
 
-    public function webhook(Request $request)
+    public function receive(Request $request)
     {
-        Log::channel('meta')
-        ->info('Meta Webhook', $request->all());
+        $payload = $request->all();
 
-        app(\App\Actions\Meta\ProcessWebhookAction::class)->execute($request->all());
+        $event = data_get(
+            $payload,
+            'entry.0.changes.0.field',
+            'unknown'
+        );
+
+        WebhookLog::create([
+            'provider'  => 'meta',
+            'event'     => $event,
+            'payload'   => $payload,
+        ]);
 
         return response()->json([
             'success' => true,
         ]);
-
     }
 }

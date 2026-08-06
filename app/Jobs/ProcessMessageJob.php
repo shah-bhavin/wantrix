@@ -7,7 +7,7 @@ use App\Enums\MessageStatus;
 use App\Models\Message;
 use App\Services\CampaignWorkflowService;
 use App\Services\MessageStatusService;
-use App\Services\WhatsAppService;
+use App\Services\Whatsapp\WhatsappManager;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -36,7 +36,7 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
     }
 
     public function handle(
-        WhatsAppService $whatsapp,
+        WhatsappManager $manager,
         CampaignWorkflowService $workflow,
         MessageStatusService $statusService
     ): void {
@@ -167,7 +167,13 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         |--------------------------------------------------------------------------
         */
 
-        $response = $whatsapp->send($this->message);
+        $provider = $manager->account(
+            $campaign->whatsappAccount
+        );
+
+        $response = $provider->send(
+            $this->message
+        );
 
         /*
         |--------------------------------------------------------------------------

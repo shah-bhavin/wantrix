@@ -19,6 +19,8 @@ return new class extends Migration
             $table->timestamp('last_retried_at')
                 ->nullable()
                 ->after('retry_count');
+
+            $table->foreignId('whatsapp_account_id')->nullable()->after('contact_id')->constrained()->nullOnDelete();
         });
     }
 
@@ -31,6 +33,7 @@ return new class extends Migration
             $table->dropColumn([
                 'retry_count',
                 'last_retried_at',
+                'whatsapp_account_id'
             ]);
         });
     }

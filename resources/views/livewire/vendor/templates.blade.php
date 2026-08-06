@@ -14,13 +14,27 @@
 
         </div>
 
-        <button
-            wire:click="syncTemplates"
+        <select wire:model="selectedAccount" class="form-select">
+            @foreach($accounts as $account)
+
+            <option value="{{ $account->id }}">
+
+                {{ $account->name }}
+
+                ({{ $account->display_phone_number }})
+
+            </option>
+
+            @endforeach
+        </select>
+
+        <button wire:click="syncTemplates"
             class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-xl font-medium">
 
             Sync Templates
 
         </button>
+        
 
     </div>
 

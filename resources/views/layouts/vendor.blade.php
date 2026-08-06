@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     @php
-        $page = \App\Support\Navigation::current();
+    $page = \App\Support\Navigation::current();
     @endphp
     <title>
         {{ $page['title'] ?? config('app.name') }}
@@ -29,14 +29,23 @@
 
             {{-- Page Content --}}
             <main class="flex-1 p-6">
-                
-                
+
+
                 {{ $slot }}
             </main>
         </div>
 
     </div>
     <x-flash-message />
+    <script>
+        window.metaConfig = {
+
+    appId: "{{ config('meta.app_id') }}",
+    configId: "{{ config('meta.config_id') }}"
+
+};
+
+    </script>
     @livewireScripts
 </body>
 

@@ -8,11 +8,28 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'graph_version' => env('META_GRAPH_VERSION', 'v25.0'),
+    'graph_version' => env('META_GRAPH_VERSION', 'v23.0'),
 
-    'graph_url' => env(
-        'META_GRAPH_URL',
-        'https://graph.facebook.com'
-    ),
+    'graph_url' => env('META_GRAPH_URL', 'https://graph.facebook.com'),
+
+     /*
+    |--------------------------------------------------------------------------
+    | Facebook App
+    |--------------------------------------------------------------------------
+    */
+
+    'app_id' => env('META_APP_ID'),
+
+    'app_secret' => env('META_APP_SECRET'),
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Embedded Signup
+    |--------------------------------------------------------------------------
+    */
+
+    'config_id' => env('META_CONFIG_ID'),
+    'webhook_verify_token' => env('META_WEBHOOK_VERIFY_TOKEN'),
 
 ];

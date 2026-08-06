@@ -43,13 +43,12 @@ Route::middleware(['auth'])
         Route::get('/groups/{group}', GroupContacts::class)->name('groups.contacts');
         Route::get('/templates', Templates::class)->name('templates');
         Route::get('/campaigns', Campaigns::class)->name('campaigns');
-        Route::get('/campaigns/{campaign}', CampaignShow::class )->name('campaigns.show');
+        Route::get('/campaigns/{campaign}', CampaignShow::class)->name('campaigns.show');
         Route::get('/messages', Messages::class)->name('messages');
         Route::get('/analytics', Analytics::class)->name('analytics');
         Route::get('/meta-setup', MetaSetup::class)->name('meta.setup');
         Route::get('/webhooks/meta', [MetaWebhookController::class, 'verify']);
         Route::post('/webhooks/meta', [MetaWebhookController::class, 'webhook']);
         Route::get('/messages/{message}', MessageShow::class)->name('messages.show');
-        Route::get('/team-members', TeamMembers::class)->name('team-members')->middleware('role:owner');;
+        Route::get('/team-members', TeamMembers::class)->name('team-members')->middleware('role:owner');
     });
-

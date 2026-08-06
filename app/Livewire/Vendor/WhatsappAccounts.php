@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Vendor;
 
-use App\Support\UsageLimit;
-use Livewire\Component;
-use App\Services\Meta\MetaApiService;
 use App\Enums\WhatsappAccountStatus;
+use App\Services\Meta\EmbeddedSignupService;
+use App\Services\Whatsapp\WhatsappService;
+use App\Support\UsageLimit;
+use Livewire\Attributes\On;
+use Livewire\Component;
 
 class WhatsappAccounts extends Component
 {
@@ -31,6 +33,8 @@ class WhatsappAccounts extends Component
     public bool $showDeleteModal = false;
     public bool $verifyingConnection = false;
     public ?int $deleteId = null;
+    public bool $embeddedSignupLoading = false;
+    public ?string $embeddedSignupCode = null;
 
     protected function rules(): array
     {
@@ -40,6 +44,12 @@ class WhatsappAccounts extends Component
             'phone_number_id' => ['required'],
             'access_token' => ['required'],
         ];
+    }
+    public function connectWithMeta()
+    {
+        $this->dispatch(
+            'open-meta-signup'
+        );
     }
 
     public function createAccount(): void
@@ -206,7 +216,7 @@ class WhatsappAccounts extends Component
             ->count();
     }
 
-    public function verifyConnection(MetaApiService $meta): void
+    public function verifyConnection(WhatsappService $whatsapp): void
     {
         $this->validate([
             'phone_number_id' => ['required'],
@@ -217,10 +227,7 @@ class WhatsappAccounts extends Component
 
         try {
 
-            $response = $meta->verifyConnection(
-                $this->phone_number_id,
-                $this->access_token
-            );
+            $response = $whatsapp->verify($account);
 
             $waba = $meta->discoverWaba(
                 $this->phone_number_id,
@@ -277,6 +284,35 @@ class WhatsappAccounts extends Component
         }
 
         $this->verifyingConnection = false;
+    }
+
+    #[On('meta-code-received')]
+    public function receiveAuthorizationCode(string $code, EmbeddedSignupService $signup): void {
+
+        $this->embeddedSignupLoading = true;
+        $this->embeddedSignupCode = $code;
+        $vendor = auth()->user()->vendor;
+        $result = $signup->finish(
+            $vendor,
+            $code
+        );
+
+        $this->embeddedSignupLoading = false;
+
+        if (! $result->success) {
+            session()->flash(
+                'error',
+                $result->error
+            );
+            return;
+        }
+
+        session()->flash(
+            'success',
+            'WhatsApp account connected successfully.'
+        );
+        
+        $this->loadStatistics();
     }
 
     public function render()

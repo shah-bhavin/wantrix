@@ -65,4 +65,8 @@ class WhatsappTemplate extends Model
     {
         return $this->status === 'PENDING';
     }
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
 }

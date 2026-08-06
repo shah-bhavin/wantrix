@@ -40,4 +40,13 @@ return [
         ],
     ],
 
+    'whatsapp' => [
+
+        'provider' => env(
+            'WHATSAPP_PROVIDER',
+            'dummy'
+        ),
+
+    ],
+
 ];

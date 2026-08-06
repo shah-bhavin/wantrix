@@ -34,6 +34,65 @@ class MetaApiService
             ->timeout(30);
     }
 
+    protected function get(string $accessToken, string $uri, array $query = []): array
+    {
+
+        $response = $this->client($accessToken)
+            ->get(
+                "{$this->baseUrl}{$uri}",
+                $query
+            );
+
+        return $this->handleResponse($response);
+    }
+
+    protected function post(string $accessToken, string $uri, array $payload = []): array
+    {
+
+        $response = $this->client($accessToken)
+            ->post(
+                "{$this->baseUrl}{$uri}",
+                $payload
+            );
+
+        return $this->handleResponse($response);
+    }
+
+    protected function handleResponse($response): array
+    {
+        if ($response->failed()) {
+
+            return [
+
+                'success' => false,
+
+                'status' => $response->status(),
+
+                'error' => $response->json(),
+            ];
+        }
+
+        return [
+
+            'success' => true,
+
+            'status' => $response->status(),
+
+            'data' => $response->json(),
+        ];
+    }
+
+    protected function delete(string $accessToken, string $uri): array
+    {
+
+        $response = $this->client($accessToken)
+            ->delete(
+                "{$this->baseUrl}{$uri}"
+            );
+
+        return $this->handleResponse($response);
+    }
+
     /**
      * Verify that the Access Token and Phone Number ID are valid.
      *
@@ -42,102 +101,545 @@ class MetaApiService
     public function verifyConnection(string $phoneNumberId, string $accessToken): array
     {
 
-        $response = $this->client($accessToken)
-            ->get(
-                "{$this->baseUrl}/{$phoneNumberId}",
-                [
-                    'fields' => implode(',', [
-                        'verified_name',
-                        'display_phone_number',
-                        'quality_rating',
-                        'code_verification_status',
-                        'id',
-                    ]),
-                ]
-            );
-
-        if ($response->failed()) {
-
-            return [
-                'success' => false,
-                'status' => $response->status(),
-                'error' => $response->json(),
-            ];
-        }
-
-        return [
-            'success' => true,
-            'data' => $response->json(),
-        ];
-    }
-
-    // public function discoverWaba(string $phoneNumberId, string $accessToken): array {
-
-    //     $response = $this->client($accessToken)
-    //         ->get(
-    //             "{$this->baseUrl}/{$phoneNumberId}",
-    //             [
-    //                 'fields' => 'whatsapp_business_account'
-    //             ]
-    //         );
-
-    //     if ($response->failed()) {
-
-    //         return [
-    //             'success' => false,
-    //             'status' => $response->status(),
-    //             'error' => $response->json(),
-    //         ];
-    //     }
-
-    //     return [
-    //         'success' => true,
-    //         'data' => $response->json(),
-    //     ];
-    // }
-
-    public function discoverWaba(string $phoneNumberId, string $accessToken): array
-    {
-        $response = $this->client($accessToken)
-            ->get(
-                "{$this->baseUrl}/{$phoneNumberId}",
-                [
-                    'fields' => 'whatsapp_business_account{id,name}'
-                ]
-            );
-
-        dd($response->json());
+        return $this->getPhoneDetails(
+            $phoneNumberId,
+            $accessToken
+        );
     }
 
     /**
-     * Get Phone Number Details.
+     * Get Business Manager.
      */
-    public function getPhoneNumber(string $phoneNumberId, string $accessToken): array
+
+    public function getBusinesses(string $accessToken): array
     {
-        throw new \RuntimeException('Not implemented yet.');
+        return $this->get(
+            $accessToken,
+            "/me/businesses"
+        );
+    }
+
+    public function getOwnedWabas(string $businessId, string $accessToken): array
+    {
+
+        return $this->get(
+
+            $accessToken,
+
+            "/{$businessId}/owned_whatsapp_business_accounts"
+        );
+    }
+
+    public function getPhoneNumbers(string $wabaId, string $accessToken): array
+    {
+
+        return $this->get(
+
+            $accessToken,
+
+            "/{$wabaId}/phone_numbers"
+        );
+    }
+
+    public function getPhoneDetails(string $phoneNumberId, string $accessToken): array
+    {
+
+        return $this->get(
+
+            $accessToken,
+
+            "/{$phoneNumberId}",
+
+            [
+
+                'fields' => implode(',', [
+
+                    'verified_name',
+
+                    'display_phone_number',
+
+                    'quality_rating',
+
+                    'code_verification_status',
+
+                    'id',
+
+                ]),
+
+            ]
+        );
+    }
+
+    public function getTemplates(
+        string $wabaId,
+        string $accessToken,
+    ): array {
+
+        return $this->get(
+
+            $accessToken,
+
+            "/{$wabaId}/message_templates"
+
+        );
+    }
+
+    /**
+     * Subscribe App to Webhook.
+     */
+    public function subscribeWebhook(string $wabaId, string $accessToken): array
+    {
+        return $this->post(
+
+            $accessToken,
+
+            "/{$wabaId}/subscribed_apps"
+
+        );
+    }
+
+    /**
+     * Exchange Embedded Signup code for token.
+     */
+    public function exchangeCode(string $code): array
+    {
+        $response = Http::asForm()->post(
+            'https://graph.facebook.com/' . config('meta.graph_version') . '/oauth/access_token',
+            [
+                'client_id'     => config('meta.app_id'),
+                'client_secret' => config('meta.app_secret'),
+                'code'          => $code,
+            ]
+        );
+
+        return $this->handleResponse($response);
+    }
+
+    public function sendText(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $body,
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'recipient_type' => 'individual',
+
+                'to' => $to,
+
+                'type' => 'text',
+
+                'text' => [
+
+                    'preview_url' => false,
+
+                    'body' => $body,
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' =>
+
+            $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
     }
 
     /**
      * Send a template message.
      */
-    public function sendTemplate(array $payload): array
-    {
-        throw new \RuntimeException('Not implemented yet.');
+    public function sendTemplate(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $templateName,
+        string $language = 'en',
+        array $variables = [],
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'template',
+
+                'template' => [
+
+                    'name' => $templateName,
+
+                    'language' => [
+
+                        'code' => $language,
+
+                    ],
+
+                    'components' => [
+
+                        [
+
+                            'type' => 'body',
+
+                            'parameters' => collect($variables)
+
+                                ->map(fn($value) => [
+
+                                    'type' => 'text',
+
+                                    'text' => (string) $value,
+
+                                ])
+
+                                ->values()
+
+                                ->all(),
+
+                        ],
+
+                    ],
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' =>
+            $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
     }
 
-    /**
-     * Send a text message.
-     */
-    public function sendText(array $payload): array
-    {
-        throw new \RuntimeException('Not implemented yet.');
+    public function sendInteractiveButtons(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $body,
+        array $buttons,
+    ): array {
+        return $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'interactive',
+
+                'interactive' => [
+
+                    'type' => 'button',
+
+                    'body' => [
+
+                        'text' => $body,
+
+                    ],
+
+                    'action' => [
+
+                        'buttons' => collect($buttons)
+                            ->take(3)
+                            ->values()
+                            ->map(function ($button, $index) {
+
+                                return [
+
+                                    'type' => 'reply',
+
+                                    'reply' => [
+
+                                        'id' => 'btn_' . $index,
+
+                                        'title' => $button,
+
+                                    ],
+
+                                ];
+                            }),
+
+                    ],
+
+                ],
+
+            ]
+
+        );
+    }
+
+    public function sendImage(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $imageUrl,
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'image',
+
+                'image' => [
+
+                    'link' => $imageUrl,
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' => $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
+    }
+
+    public function sendDocument(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $documentUrl,
+        ?string $filename = null,
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'document',
+
+                'document' => [
+
+                    'link' => $documentUrl,
+
+                    'filename' => $filename,
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' =>
+
+            $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
+    }
+
+    public function sendVideo(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $videoUrl,
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'video',
+
+                'video' => [
+
+                    'link' => $videoUrl,
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' =>
+            $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
+    }
+
+    public function sendAudio(
+        string $phoneNumberId,
+        string $accessToken,
+        string $to,
+        string $audioUrl,
+    ): array {
+
+        $result = $this->post(
+
+            $accessToken,
+
+            "/{$phoneNumberId}/messages",
+
+            [
+
+                'messaging_product' => 'whatsapp',
+
+                'to' => $to,
+
+                'type' => 'audio',
+
+                'audio' => [
+
+                    'link' => $audioUrl,
+
+                ],
+
+            ]
+
+        );
+
+        if (! $result['success']) {
+            return $result;
+        }
+
+        return [
+
+            'success' => true,
+
+            'message_id' =>
+            $result['data']['messages'][0]['id'] ?? null,
+
+            'raw' => $result['data'],
+
+        ];
     }
 
     /**
      * Upload media.
      */
-    public function uploadMedia(array $payload): array
-    {
-        throw new \RuntimeException('Not implemented yet.');
+    public function uploadMedia(
+        string $phoneNumberId,
+        string $accessToken,
+        string $path,
+        string $mimeType,
+    ): array {
+
+        $response = Http::withToken($accessToken)
+
+            ->attach(
+
+                'file',
+
+                fopen($path, 'r'),
+
+                basename($path)
+
+            )
+
+            ->post(
+
+                "{$this->baseUrl}/{$phoneNumberId}/media",
+
+                [
+
+                    'messaging_product' => 'whatsapp',
+
+                    'type' => $mimeType,
+
+                ]
+
+            );
+
+        return $this->handleResponse($response);
     }
 }

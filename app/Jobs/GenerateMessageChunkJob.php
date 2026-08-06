@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\MessageStatus;
+use App\Enums\MessageType;
 use App\Models\Campaign;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,6 +38,7 @@ class GenerateMessageChunkJob implements ShouldQueue
                 ->create([
                     'vendor_id' => $this->campaign->vendor_id,
                     'contact_id' => $contact->id,
+                    'type' => MessageType::TEXT,
                     'body' => $this->campaign->template->body,
                     'status' => MessageStatus::PENDING,
                 ]);
