@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
+use App\Enums\MessageType;
 use App\Models\CampaignActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +20,8 @@ class Campaign extends Model
         'status',
         'messages_generated_at',
         'message_delay_seconds',
+        'message_type',
+        'media_library_id',
         'scheduled_at',
         'started_at',
         'completed_at',
@@ -31,6 +34,7 @@ class Campaign extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'message_type' => MessageType::class,
         'messages_generated_at' => 'datetime',
     ];
 
@@ -122,5 +126,13 @@ class Campaign extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(CampaignActivity::class);
+    }
+
+    public function media()
+    {
+        return $this->belongsTo(
+            MediaLibrary::class,
+            'media_library_id'
+        );
     }
 }

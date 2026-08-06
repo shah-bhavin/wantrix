@@ -36,11 +36,23 @@ class GenerateMessageChunkJob implements ShouldQueue
             $message = $this->campaign
                 ->messages()
                 ->create([
-                    'vendor_id' => $this->campaign->vendor_id,
-                    'contact_id' => $contact->id,
-                    'type' => MessageType::TEXT,
-                    'body' => $this->campaign->template->body,
-                    'status' => MessageStatus::PENDING,
+
+                    'vendor_id'            => $this->campaign->vendor_id,
+
+                    'contact_id'           => $contact->id,
+
+                    'whatsapp_account_id'  => $this->campaign->whatsapp_account_id,
+
+                    'whatsapp_template_id' => $this->campaign->template_id,
+
+                    'media_library_id'     => $this->campaign->media_library_id,
+
+                    'type'                 => $this->campaign->message_type,
+
+                    'body'                 => $this->resolveBody(),
+
+                    'status'               => MessageStatus::PENDING,
+
                 ]);
 
             $message->statusHistories()->create([
@@ -48,5 +60,28 @@ class GenerateMessageChunkJob implements ShouldQueue
                 'changed_at' => now(),
             ]);
         }
+    }
+
+    protected function resolveBody(): ?string
+    {
+        return match ($this->campaign->message_type) {
+
+            MessageType::TEXT =>
+            $this->campaign->template?->body,
+
+            MessageType::BUTTONS =>
+            $this->campaign->template?->body,
+
+            MessageType::TEMPLATE =>
+            null,
+
+            MessageType::IMAGE,
+            MessageType::VIDEO,
+            MessageType::DOCUMENT,
+            MessageType::AUDIO =>
+            null,
+
+            default => '',
+        };
     }
 }

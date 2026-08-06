@@ -171,6 +171,41 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
             $campaign->whatsappAccount
         );
 
+        if (
+            $this->message->media &&
+            ! $this->message->media->uploaded_to_meta
+        ) {
+
+            $upload = $provider->uploadMedia(
+                $campaign->whatsappAccount,
+                $this->message->media
+            );
+
+            if (! $upload['success']) {
+
+                $statusService->change(
+                    $this->message,
+                    MessageStatus::FAILED,
+                    [
+                        'failure_reason' => $upload['error'] ?? 'Unable to upload media.'
+                    ]
+                );
+
+                $workflow->complete($campaign->fresh());
+
+                return;
+            }
+
+            // Refresh relationship so MetaProvider can read meta_media_id
+            $this->message->refresh()->load('media');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Message
+        |--------------------------------------------------------------------------
+        */
+
         $response = $provider->send(
             $this->message
         );

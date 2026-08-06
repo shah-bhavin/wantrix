@@ -3,7 +3,9 @@
 namespace App\Services\Whatsapp\Providers;
 
 use App\Enums\MessageType;
+use App\Models\MediaLibrary;
 use App\Models\Message;
+use App\Models\WhatsappAccount;
 use App\Services\Meta\MetaApiService;
 use App\Services\Whatsapp\Contracts\WhatsappProvider;
 use App\Services\Whatsapp\TemplateVariableService;
@@ -18,8 +20,15 @@ class MetaProvider implements WhatsappProvider
     public function send(Message $message): array
     {
         $message->loadMissing([
+
             'campaign.whatsappAccount',
+
             'contact',
+
+            'whatsappTemplate',
+
+            'media',
+
         ]);
 
         $account = $message->campaign->whatsappAccount;
@@ -46,9 +55,47 @@ class MetaProvider implements WhatsappProvider
             ];
         }
 
-        $message->loadMissing(
-            'whatsappTemplate'
-        );
+        if (
+
+            in_array(
+
+                $message->type,
+
+                [
+
+                    MessageType::IMAGE,
+
+                    MessageType::DOCUMENT,
+
+                    MessageType::VIDEO,
+
+                    MessageType::AUDIO,
+
+                ]
+
+            )
+
+        ) {
+
+            if (
+
+                ! $message->media
+
+                || ! $message->media->uploaded_to_meta
+
+                || blank($message->media->meta_media_id)
+
+            ) {
+
+                return [
+
+                    'success' => false,
+
+                    'error' => "Media '{$message->media->original_name}' has not been uploaded to Meta."
+
+                ];
+            }
+        }
 
         return match ($message->type) {
 
@@ -113,7 +160,7 @@ class MetaProvider implements WhatsappProvider
 
                 to: $message->contact->phone_number,
 
-                imageUrl: $message->body,
+                metaMediaId: $message->media->meta_media_id
 
             ),
 
@@ -127,9 +174,7 @@ class MetaProvider implements WhatsappProvider
 
                 to: $message->contact->phone_number,
 
-                documentUrl: $message->body,
-
-                filename: 'document.pdf',
+                metaMediaId: $message->media->meta_media_id,
 
             ),
 
@@ -143,7 +188,7 @@ class MetaProvider implements WhatsappProvider
 
                 to: $message->contact->phone_number,
 
-                videoUrl: $message->body,
+                metaMediaId: $message->media->meta_media_id,
 
             ),
 
@@ -157,7 +202,7 @@ class MetaProvider implements WhatsappProvider
 
                 to: $message->contact->phone_number,
 
-                audioUrl: $message->body,
+                metaMediaId: $message->media->meta_media_id,
 
             ),
 
@@ -171,6 +216,30 @@ class MetaProvider implements WhatsappProvider
         };
     }
 
+    public function uploadMedia(
+        WhatsappAccount $account,
+        MediaLibrary $media
+        ): array {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Temporary Stub
+            |--------------------------------------------------------------------------
+            |
+            | The actual implementation will upload the file to the Meta Graph API.
+            | Until then we return a clean error instead of pretending success.
+            |
+            */
+
+            return [
+
+                'success' => false,
+
+                'error' => 'Meta media upload is not implemented yet.',
+
+            ];
+    }
+
     public function verifyConnection(array $credentials): array
     {
         return [];
@@ -179,5 +248,10 @@ class MetaProvider implements WhatsappProvider
     public function subscribeWebhook(array $credentials): array
     {
         return [];
+    }
+
+    public function uploadMedia()
+    {
+        // Fake upload
     }
 }

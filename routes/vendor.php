@@ -12,6 +12,7 @@ use App\Livewire\Vendor\GroupContacts;
 use App\Livewire\Vendor\Groups;
 use App\Livewire\Vendor\ImportContacts;
 use App\Livewire\Vendor\Invoices;
+use App\Livewire\Vendor\MediaLibrary;
 use App\Livewire\Vendor\Messages;
 use App\Livewire\Vendor\MessageShow;
 use App\Livewire\Vendor\MetaSetup;
@@ -51,4 +52,5 @@ Route::middleware(['auth'])
         Route::post('/webhooks/meta', [MetaWebhookController::class, 'webhook']);
         Route::get('/messages/{message}', MessageShow::class)->name('messages.show');
         Route::get('/team-members', TeamMembers::class)->name('team-members')->middleware('role:owner');
+        Route::get('/media-library', MediaLibrary::class)->name('media-library');
     });

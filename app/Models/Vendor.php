@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VendorStatus;
+use App\Models\MediaLibrary;
 use App\Models\WhatsappTemplate;
 use App\Observers\VendorObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -122,5 +123,11 @@ class Vendor extends Model
     public function whatsappTemplates()
     {
         return $this->hasMany(WhatsappTemplate::class);
+    }
+    public function mediaLibraries()
+    {
+        return $this->hasMany(
+            MediaLibrary::class
+        );
     }
 }

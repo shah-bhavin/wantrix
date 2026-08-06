@@ -417,201 +417,95 @@ class MetaApiService
         string $phoneNumberId,
         string $accessToken,
         string $to,
-        string $imageUrl,
+        string $metaMediaId,
     ): array {
-
-        $result = $this->post(
-
+        return $this->post(
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'to' => $to,
-
                 'type' => 'image',
-
                 'image' => [
-
-                    'link' => $imageUrl,
-
+                    'id' => $metaMediaId,
                 ],
-
             ]
-
         );
-
-        if (! $result['success']) {
-            return $result;
-        }
-
-        return [
-
-            'success' => true,
-
-            'message_id' => $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
-        ];
     }
 
     public function sendDocument(
         string $phoneNumberId,
         string $accessToken,
         string $to,
-        string $documentUrl,
-        ?string $filename = null,
+        string $metaMediaId,
     ): array {
-
-        $result = $this->post(
-
+        return $this->post(
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'to' => $to,
-
                 'type' => 'document',
-
                 'document' => [
-
-                    'link' => $documentUrl,
-
-                    'filename' => $filename,
-
+                    'id' => $metaMediaId,
                 ],
-
             ]
-
         );
-
-        if (! $result['success']) {
-            return $result;
-        }
-
-        return [
-
-            'success' => true,
-
-            'message_id' =>
-
-            $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
-        ];
     }
 
     public function sendVideo(
         string $phoneNumberId,
         string $accessToken,
         string $to,
-        string $videoUrl,
+        string $metaMediaId,
     ): array {
-
-        $result = $this->post(
-
+        return $this->post(
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'to' => $to,
-
                 'type' => 'video',
-
                 'video' => [
-
-                    'link' => $videoUrl,
-
+                    'id' => $metaMediaId,
                 ],
-
             ]
-
         );
-
-        if (! $result['success']) {
-            return $result;
-        }
-
-        return [
-
-            'success' => true,
-
-            'message_id' =>
-            $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
-        ];
     }
 
     public function sendAudio(
         string $phoneNumberId,
         string $accessToken,
         string $to,
-        string $audioUrl,
+        string $metaMediaId,
     ): array {
-
-        $result = $this->post(
-
+        return $this->post(
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'to' => $to,
-
                 'type' => 'audio',
-
                 'audio' => [
-
-                    'link' => $audioUrl,
-
+                    'id' => $metaMediaId,
                 ],
-
             ]
-
         );
-
-        if (! $result['success']) {
-            return $result;
-        }
-
-        return [
-
-            'success' => true,
-
-            'message_id' =>
-            $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
-        ];
     }
 
     /**
      * Upload media.
      */
     public function uploadMedia(
+
         string $phoneNumberId,
+
         string $accessToken,
+
         string $path,
+
         string $mimeType,
+
     ): array {
 
         $response = Http::withToken($accessToken)

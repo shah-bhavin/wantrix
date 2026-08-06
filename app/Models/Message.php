@@ -29,7 +29,8 @@ class Message extends Model
         'last_retried_at',
         'whatsapp_template_id',
         'template_variables',
-
+        'media_library_id',
+        'whatsapp_account_id',
     ];
 
     protected $casts = [
@@ -82,5 +83,9 @@ class Message extends Model
         return $this->belongsTo(
             WhatsappTemplate::class
         );
+    }
+    public function media()
+    {
+        return $this->belongsTo(MediaLibrary::class, 'media_library_id');
     }
 }

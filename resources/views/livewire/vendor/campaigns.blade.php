@@ -34,14 +34,78 @@
                     <option value="{{ $group->id }}">{{ $group->name }}</option>
                     @endforeach
                 </select>
+                <div>
+                    <select wire:model.live="message_type"
+                        class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
+                        <option value="">Message Type</option>
+                        <option value="template">Template</option>
+                        <option value="text">Text</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="document">Document</option>
+                        <option value="audio">Audio</option>
+                        <option value="buttons">Buttons</option>
 
-                <select wire:model="template_id"
-                    class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
-                    <option value="">Select Template</option>
-                    @foreach($templates as $template)
-                    <option value="{{ $template->id }}">{{ $template->name }}</option>
-                    @endforeach
-                </select>
+                    </select>
+                </div>
+
+                @if($message_type === 'template')
+
+                <div>
+
+                    <select wire:model="template_id"
+                        class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
+
+                        <option value="">Select Template</option>
+
+                        @foreach($templates as $template)
+
+                        <option value="{{ $template->id }}">
+                            {{ $template->name }}
+                        </option>
+
+                        @endforeach
+
+                    </select>
+
+                </div>
+
+
+
+                @endif
+
+                @if(in_array($message_type, [
+                'image',
+                'video',
+                'document',
+                'audio'
+                ]))
+
+                <div>
+
+                    <select wire:model="media_library_id" class="w-full rounded-xl border-slate-300">
+
+                        <option value="">Select Media</option>
+
+                        @foreach($media as $item)
+
+                        @if($item->type->value === $message_type)
+
+                        <option value="{{ $item->id }}">
+
+                            {{ $item->original_name }}
+
+                        </option>
+
+                        @endif
+
+                        @endforeach
+
+                    </select>
+
+                </div>
+
+                @endif
 
                 <select wire:model="whatsapp_account_id"
                     class="w-full rounded-xl border-slate-300 focus:border-amber-500 focus:ring-amber-500">
@@ -157,5 +221,5 @@
             </tbody>
         </table>
     </div>
-    
+
 </div>

@@ -2,41 +2,6 @@
 
 return [
 
-    //  [
-    //     'label' => 'Dashboard',
-
-    //     'route' => 'vendor.dashboard',
-
-    //     'icon' => 'home',
-
-    //     'page' => [
-
-    //         'title' => 'Dashboards',
-
-    //         'heading' => 'Welcome Back',
-
-    //         'description' => 'Overview of your WhatsApp Business',
-
-    //         'browser_title' => 'Dashboard',
-
-    //         'seo' => [
-    //             'title' => 'Dashboard | Wantrix',
-    //             'description' => 'Manage your WhatsApp Business Dashboard.',
-    //             'keywords' => [
-    //                 'dashboard',
-    //                 'whatsapp',
-    //                 'wantrix',
-    //             ],
-    //         ],
-
-    //         'social' => [
-    //             'title' => 'Wantrix Dashboard',
-    //             'description' => 'Manage campaigns, contacts and analytics.',
-    //             'image' => '/images/social/dashboard.png',
-    //         ],
-    //     ],
-    // ],
-
     [
         'label'=>'Dashboard',
 
@@ -99,6 +64,11 @@ return [
             [
                 'label' => 'Messages',
                 'route' => 'vendor.messages',
+                'icon' => 'chat-bubble-left-right',
+            ],
+            [
+                'label' => 'Media Library',
+                'route' => 'vendor.media-library',
                 'icon' => 'chat-bubble-left-right',
             ],
 

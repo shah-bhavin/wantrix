@@ -15,6 +15,8 @@ class Campaigns extends Component
     public string $name = '';
     public string $group_id = '';
     public string $template_id = '';
+    public string $message_type = 'template';
+    public ?int $media_library_id = null;
     public string $whatsapp_account_id = '';
     public ?string $scheduled_at = null;
     public int $message_delay_seconds = 0;
@@ -49,6 +51,8 @@ class Campaigns extends Component
             'vendor_id' => auth()->user()->vendor_id,
             'group_id' => $this->group_id,
             'template_id' => $this->template_id,
+            'message_type' => $this->message_type,
+            'media_library_id' => $this->media_library_id,
             'whatsapp_account_id' => $this->whatsapp_account_id,
             'name' => $this->name,
             'status' => $this->scheduled_at
@@ -58,7 +62,8 @@ class Campaigns extends Component
             'message_delay_seconds' => $this->message_delay_seconds,
         ]);
 
-        $this->reset(['name', 'group_id', 'template_id', 'whatsapp_account_id']);
+        $this->reset(['name', 'group_id', 'template_id','media_library_id', 'whatsapp_account_id']);
+        $this->message_type = 'template';
         $this->showCreateModal = false;
 
         session()->flash('success', 'Campaign created successfully.');
@@ -80,6 +85,11 @@ class Campaigns extends Component
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
-        return view('livewire.vendor.campaigns', compact('campaigns', 'groups', 'templates', 'whatsappAccounts'))->layout('layouts.vendor');
+        $media = $vendor
+            ->mediaLibraries()
+            ->where('uploaded_to_meta', true)
+            ->orderBy('original_name')
+            ->get();
+        return view('livewire.vendor.campaigns', compact('campaigns', 'groups', 'templates', 'whatsappAccounts', 'media'))->layout('layouts.vendor');
     }
 }
