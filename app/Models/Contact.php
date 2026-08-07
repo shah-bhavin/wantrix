@@ -19,7 +19,7 @@ class Contact extends Model
         'status',
         'last_contacted_at',
     ];
-    
+
     protected $casts = [
         'last_contacted_at' => 'datetime',
     ];
@@ -43,5 +43,10 @@ class Contact extends Model
         return $this->hasMany(Message::class);
     }
 
-
+    public function conversations()
+    {
+        return $this->hasMany(
+            Conversation::class
+        );
+    }
 }

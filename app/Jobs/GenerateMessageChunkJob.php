@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Conversations\FindOrCreateConversationAction;
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
 use App\Models\Campaign;
@@ -33,27 +34,43 @@ class GenerateMessageChunkJob implements ShouldQueue
             ->get();
 
         foreach ($contacts as $contact) {
+
+            $conversation = app(FindOrCreateConversationAction::class)->execute(
+                $contact,
+                $this->campaign->whatsappAccount
+            );
+
             $message = $this->campaign
                 ->messages()
                 ->create([
 
-                    'vendor_id'            => $this->campaign->vendor_id,
+                    'vendor_id' => $this->campaign->vendor_id,
 
-                    'contact_id'           => $contact->id,
+                    'campaign_id' => $this->campaign->id,
 
-                    'whatsapp_account_id'  => $this->campaign->whatsapp_account_id,
+                    'conversation_id' => $conversation->id,
+
+                    'contact_id' => $contact->id,
+
+                    'direction' => 'outgoing',
+
+                    'whatsapp_account_id' => $this->campaign->whatsapp_account_id,
 
                     'whatsapp_template_id' => $this->campaign->template_id,
 
-                    'media_library_id'     => $this->campaign->media_library_id,
+                    'media_library_id' => $this->campaign->template?->media_library_id,
 
-                    'type'                 => $this->campaign->message_type,
+                    'type' => $this->campaign->template->resolvedMessageType(),
 
-                    'body'                 => $this->resolveBody(),
+                    'body' => $this->campaign->template->body,
 
-                    'status'               => MessageStatus::PENDING,
+                    'template_variables' => [],
 
-                ]);
+                    'status' => MessageStatus::PENDING,
+
+            ]);
+
+            $conversation->touchOutgoing();
 
             $message->statusHistories()->create([
                 'status' => MessageStatus::PENDING,

@@ -249,9 +249,4 @@ class MetaProvider implements WhatsappProvider
     {
         return [];
     }
-
-    public function uploadMedia()
-    {
-        // Fake upload
-    }
 }

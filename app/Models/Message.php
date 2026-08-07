@@ -16,7 +16,9 @@ class Message extends Model
     protected $fillable = [
         'vendor_id',
         'campaign_id',
+        'conversation_id',
         'contact_id',
+        'direction',
         'body',
         'type',
         'status',
@@ -87,5 +89,11 @@ class Message extends Model
     public function media()
     {
         return $this->belongsTo(MediaLibrary::class, 'media_library_id');
+    }
+    public function conversation()
+    {
+        return $this->belongsTo(
+            Conversation::class
+        );
     }
 }

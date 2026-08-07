@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WebhookLog;
+use App\Services\Webhooks\MetaWebhookDispatcher;
 use Illuminate\Http\Request;
 
 class MetaWebhookController extends Controller
@@ -23,7 +24,7 @@ class MetaWebhookController extends Controller
         return response('Forbidden', 403);
     }
 
-    public function receive(Request $request)
+    public function webhook(Request $request)
     {
         $payload = $request->all();
 
@@ -34,10 +35,13 @@ class MetaWebhookController extends Controller
         );
 
         WebhookLog::create([
-            'provider'  => 'meta',
-            'event'     => $event,
-            'payload'   => $payload,
+            'provider' => 'meta',
+            'event'    => $event,
+            'payload'  => $payload,
         ]);
+
+        app(MetaWebhookDispatcher::class)
+            ->dispatch($payload);
 
         return response()->json([
             'success' => true,

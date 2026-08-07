@@ -32,11 +32,6 @@ class DummyProvider implements WhatsappProvider
         ];
     }
 
-    public function uploadMedia(
-        WhatsappAccount $account,
-        MediaLibrary $media
-    ): array;
-
     public function verifyConnection(array $credentials): array
     {
         return [

@@ -11,6 +11,7 @@ use App\Livewire\Vendor\Dashboard;
 use App\Livewire\Vendor\GroupContacts;
 use App\Livewire\Vendor\Groups;
 use App\Livewire\Vendor\ImportContacts;
+use App\Livewire\Vendor\Inbox;
 use App\Livewire\Vendor\Invoices;
 use App\Livewire\Vendor\MediaLibrary;
 use App\Livewire\Vendor\Messages;
@@ -53,4 +54,5 @@ Route::middleware(['auth'])
         Route::get('/messages/{message}', MessageShow::class)->name('messages.show');
         Route::get('/team-members', TeamMembers::class)->name('team-members')->middleware('role:owner');
         Route::get('/media-library', MediaLibrary::class)->name('media-library');
+        Route::get('/inbox', Inbox::class)->name('inbox');
     });

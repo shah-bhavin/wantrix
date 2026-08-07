@@ -130,4 +130,10 @@ class Vendor extends Model
             MediaLibrary::class
         );
     }
+    public function conversations()
+    {
+        return $this->hasMany(
+            Conversation::class
+        );
+    }
 }

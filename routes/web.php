@@ -23,4 +23,4 @@ Route::middleware('guest')->group(function () {
 
 
 Route::get('/webhook/meta', [MetaWebhookController::class, 'verify']);
-Route::post('/webhook/meta', [MetaWebhookController::class, 'receive']);
+Route::post('/webhook/meta', [MetaWebhookController::class, 'webhook']);
