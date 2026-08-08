@@ -2,6 +2,8 @@
 
 namespace App\Services\Meta;
 
+use Illuminate\Support\Facades\Http;
+
 class MetaOAuthService
 {
     /**

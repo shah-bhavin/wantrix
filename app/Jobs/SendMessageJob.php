@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Enums\MessageStatus;
 use App\Models\Message;
 use App\Services\Whatsapp\WhatsappManager;
-use App\Enums\MessageStatus;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -31,6 +31,12 @@ class SendMessageJob implements ShouldQueue
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Mark as SENDING
+        |--------------------------------------------------------------------------
+        */
+
         $message->update([
             'status' => MessageStatus::SENDING,
         ]);
@@ -40,7 +46,17 @@ class SendMessageJob implements ShouldQueue
             'changed_at' => now(),
         ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | WhatsApp Account
+        |--------------------------------------------------------------------------
+        */
+
         $account = $message->whatsappAccount;
+
+        if (! $account && $message->campaign) {
+            $account = $message->campaign->whatsappAccount;
+        }
 
         if (! $account) {
             $this->markFailed(
@@ -51,15 +67,25 @@ class SendMessageJob implements ShouldQueue
             return;
         }
 
-        try {
+        /*
+        |--------------------------------------------------------------------------
+        | Send Message
+        |--------------------------------------------------------------------------
+        */
 
+        try {
             $provider = $manager->account($account);
 
             $result = $provider->send($message);
 
-            if (
-                ! ($result['success'] ?? false)
-            ) {
+            /*
+            |--------------------------------------------------------------------------
+            | Provider Failure
+            |--------------------------------------------------------------------------
+            */
+
+            if (! ($result['success'] ?? false)) {
+
                 $this->markFailed(
                     $message,
                     $result['error'] ?? 'WhatsApp provider failed.'
@@ -67,6 +93,12 @@ class SendMessageJob implements ShouldQueue
 
                 return;
             }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Success
+            |--------------------------------------------------------------------------
+            */
 
             $message->update([
                 'status' => MessageStatus::SENT,
@@ -92,10 +124,18 @@ class SendMessageJob implements ShouldQueue
         }
     }
 
+    /**
+     * Mark message as failed.
+     *
+     * Meta API errors can be either strings or arrays.
+     */
     protected function markFailed(
         Message $message,
-        string $reason
+        mixed $reason
     ): void {
+
+        $reason = $this->normalizeFailureReason($reason);
+
         $message->update([
             'status' => MessageStatus::FAILED,
             'failure_reason' => $reason,
@@ -105,5 +145,30 @@ class SendMessageJob implements ShouldQueue
             'status' => MessageStatus::FAILED,
             'changed_at' => now(),
         ]);
+    }
+
+    /**
+     * Convert provider/API errors into a readable string.
+     */
+    protected function normalizeFailureReason(mixed $reason): string
+    {
+        if (is_string($reason)) {
+            return $reason;
+        }
+
+        if (is_array($reason)) {
+            return json_encode(
+                $reason,
+                JSON_UNESCAPED_UNICODE |
+                JSON_UNESCAPED_SLASHES |
+                JSON_PRETTY_PRINT
+            ) ?: 'Unknown provider error.';
+        }
+
+        if ($reason instanceof \Throwable) {
+            return $reason->getMessage();
+        }
+
+        return (string) $reason;
     }
 }
