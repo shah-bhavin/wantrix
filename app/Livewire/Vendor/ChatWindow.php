@@ -13,6 +13,8 @@ class ChatWindow extends Component
 
     public array $chatMessages = [];
     public string $messageText = '';
+    public ?string $lastLoadedMessageAt = null;
+
 
     #[On('conversation-selected')]
     public function loadConversation(int $id): void
@@ -34,6 +36,7 @@ class ChatWindow extends Component
     {
         if (! $this->conversation) {
             $this->chatMessages = [];
+            $this->lastLoadedMessageAt = null;
 
             return;
         }
@@ -46,18 +49,12 @@ class ChatWindow extends Component
             ])
             ->get()
             ->map(function ($message) {
-
                 return [
                     'id' => $message->id,
-
                     'direction' => 'incoming',
-
                     'type' => $message->type,
-
                     'body' => $message->body,
-
                     'media' => $message->media,
-
                     'created_at' => $message->received_at
                         ?? $message->created_at,
                 ];
@@ -72,18 +69,12 @@ class ChatWindow extends Component
             ])
             ->get()
             ->map(function ($message) {
-
                 return [
                     'id' => $message->id,
-
                     'direction' => 'outgoing',
-
                     'type' => $message->type,
-
                     'body' => $message->body,
-
                     'media' => $message->media,
-
                     'created_at' => $message->sent_at
                         ?? $message->created_at,
                 ];
@@ -97,7 +88,22 @@ class ChatWindow extends Component
 
         /*
         |--------------------------------------------------------------------------
-        | Tell the browser to scroll to the latest message
+        | Remember the latest message actually loaded into the UI
+        |--------------------------------------------------------------------------
+        */
+
+        $latestMessageAt = collect($this->chatMessages)
+            ->pluck('created_at')
+            ->filter()
+            ->max();
+
+        if ($latestMessageAt) {
+            $this->lastLoadedMessageAt = $latestMessageAt->format('Y-m-d H:i:s');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Tell browser to scroll to latest message
         |--------------------------------------------------------------------------
         */
 
@@ -260,17 +266,36 @@ class ChatWindow extends Component
             return;
         }
 
+        /*
+    |--------------------------------------------------------------------------
+    | Get latest incoming message
+    |--------------------------------------------------------------------------
+    */
+
         $latestIncoming = $this->conversation
             ->incomingMessages()
             ->latest('received_at')
             ->first();
+
+        /*
+    |--------------------------------------------------------------------------
+    | Get latest outgoing message
+    |--------------------------------------------------------------------------
+    */
 
         $latestOutgoing = $this->conversation
             ->outgoingMessages()
             ->latest('sent_at')
             ->first();
 
+        /*
+    |--------------------------------------------------------------------------
+    | Determine latest message timestamp
+    |--------------------------------------------------------------------------
+    */
+
         $latestIncomingAt = $latestIncoming?->received_at;
+
         $latestOutgoingAt = $latestOutgoing?->sent_at;
 
         $latestMessageAt = collect([
@@ -280,14 +305,29 @@ class ChatWindow extends Component
             ->filter()
             ->max();
 
+        if (! $latestMessageAt) {
+            return;
+        }
+
+        $latestMessageAtString = $latestMessageAt->format('Y-m-d H:i:s');
+
+        /*
+    |--------------------------------------------------------------------------
+    | Compare with the message actually loaded in the browser
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | We DO NOT compare against conversations.last_message_at.
+    |
+    | last_message_at is updated by the webhook itself, so it can already
+    | contain the new message before ChatWindow loads it.
+    |
+    */
+
         if (
-            $latestMessageAt &&
-            (
-                ! $this->conversation->last_message_at ||
-                $latestMessageAt->gt(
-                    $this->conversation->last_message_at
-                )
-            )
+            $this->lastLoadedMessageAt === null ||
+            $latestMessageAtString !== $this->lastLoadedMessageAt
         ) {
             $this->conversation = $this->conversation->fresh([
                 'contact',
