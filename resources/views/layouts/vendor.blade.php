@@ -41,8 +41,7 @@
         window.metaConfig = {
 
     appId: "{{ config('meta.app_id') }}",
-    configId: "{{ config('meta.config_id') }}"
-
+    configId: "{{ config('meta.embedded_signup.config_id') }}"
 };
 
     </script>

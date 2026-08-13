@@ -12,34 +12,152 @@ class ChatWindow extends Component
     public ?Conversation $conversation = null;
 
     public array $chatMessages = [];
+
     public string $messageText = '';
+
     public ?string $lastLoadedMessageAt = null;
 
+    /*
+    |--------------------------------------------------------------------------
+    | Currently selected WhatsApp account
+    |--------------------------------------------------------------------------
+    */
+
+    public ?int $selectedWhatsappAccountId = null;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Conversation Selected
+    |--------------------------------------------------------------------------
+    */
 
     #[On('conversation-selected')]
     public function loadConversation(int $id): void
     {
-        $this->conversation = Conversation::with([
-            'contact',
-        ])->find($id);
+        $vendorId = auth()->user()->vendor_id;
 
-        if (! $this->conversation) {
-            return;
-        }
+        /*
+        |--------------------------------------------------------------------------
+        | Load conversation safely
+        |--------------------------------------------------------------------------
+        |
+        | The conversation must belong to the authenticated vendor.
+        |
+        | If a WhatsApp account is currently selected, the conversation
+        | must also belong to that WhatsApp account.
+        |
+        */
 
-        $this->markAsRead();
+        $conversation = Conversation::query()
+            ->where('vendor_id', $vendorId)
 
-        $this->loadMessages();
-    }
+            ->when(
+                $this->selectedWhatsappAccountId !== null,
+                fn ($query) => $query->where(
+                    'whatsapp_account_id',
+                    $this->selectedWhatsappAccountId
+                )
+            )
 
-    public function loadMessages(): void
-    {
-        if (! $this->conversation) {
+            ->with('contact')
+
+            ->find($id);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Invalid / inaccessible conversation
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $conversation) {
+            $this->conversation = null;
             $this->chatMessages = [];
             $this->lastLoadedMessageAt = null;
 
             return;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Store conversation
+        |--------------------------------------------------------------------------
+        */
+
+        $this->conversation = $conversation;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark conversation as read
+        |--------------------------------------------------------------------------
+        */
+
+        $this->markAsRead();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Load messages
+        |--------------------------------------------------------------------------
+        */
+
+        $this->loadMessages();
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Account Changed
+    |--------------------------------------------------------------------------
+    */
+
+    #[On('conversation-account-changed')]
+    public function changeWhatsappAccount(?int $accountId = null): void
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Store selected account
+        |--------------------------------------------------------------------------
+        */
+
+        $this->selectedWhatsappAccountId = $accountId;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clear currently opened conversation
+        |--------------------------------------------------------------------------
+        */
+
+        $this->conversation = null;
+
+        $this->chatMessages = [];
+
+        $this->messageText = '';
+
+        $this->lastLoadedMessageAt = null;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Messages
+    |--------------------------------------------------------------------------
+    */
+
+    public function loadMessages(): void
+    {
+        if (! $this->conversation) {
+            $this->chatMessages = [];
+
+            $this->lastLoadedMessageAt = null;
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Incoming Messages
+        |--------------------------------------------------------------------------
+        */
 
         $incomingMessages = $this->conversation
             ->incomingMessages()
@@ -49,16 +167,30 @@ class ChatWindow extends Component
             ])
             ->get()
             ->map(function ($message) {
+
                 return [
                     'id' => $message->id,
+
                     'direction' => 'incoming',
+
                     'type' => $message->type,
+
                     'body' => $message->body,
+
                     'media' => $message->media,
+
                     'created_at' => $message->received_at
                         ?? $message->created_at,
                 ];
+
             });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Outgoing Messages
+        |--------------------------------------------------------------------------
+        */
 
         $outgoingMessages = $this->conversation
             ->outgoingMessages()
@@ -69,16 +201,30 @@ class ChatWindow extends Component
             ])
             ->get()
             ->map(function ($message) {
+
                 return [
                     'id' => $message->id,
+
                     'direction' => 'outgoing',
+
                     'type' => $message->type,
+
                     'body' => $message->body,
+
                     'media' => $message->media,
+
                     'created_at' => $message->sent_at
                         ?? $message->created_at,
                 ];
+
             });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Merge & Sort
+        |--------------------------------------------------------------------------
+        */
 
         $this->chatMessages = $incomingMessages
             ->concat($outgoingMessages)
@@ -86,9 +232,10 @@ class ChatWindow extends Component
             ->values()
             ->all();
 
+
         /*
         |--------------------------------------------------------------------------
-        | Remember the latest message actually loaded into the UI
+        | Remember Latest Loaded Message
         |--------------------------------------------------------------------------
         */
 
@@ -98,17 +245,28 @@ class ChatWindow extends Component
             ->max();
 
         if ($latestMessageAt) {
-            $this->lastLoadedMessageAt = $latestMessageAt->format('Y-m-d H:i:s');
+
+            $this->lastLoadedMessageAt =
+                $latestMessageAt->format('Y-m-d H:i:s');
+
         }
+
 
         /*
         |--------------------------------------------------------------------------
-        | Tell browser to scroll to latest message
+        | Scroll Browser To Latest Message
         |--------------------------------------------------------------------------
         */
 
         $this->dispatch('chat-messages-updated');
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Local Test Incoming Message
+    |--------------------------------------------------------------------------
+    */
 
     public function createTestMessage(): void
     {
@@ -120,51 +278,77 @@ class ChatWindow extends Component
             'contact',
         ]);
 
+        if (! $conversation) {
+            return;
+        }
+
         $conversation->incomingMessages()->create([
-            'vendor_id' => $conversation->vendor_id,
 
-            'contact_id' => $conversation->contact_id,
+            'vendor_id' =>
+                $conversation->vendor_id,
 
-            'whatsapp_account_id' => $conversation->whatsapp_account_id,
+            'contact_id' =>
+                $conversation->contact_id,
 
-            'provider_message_id' => 'test-' . uniqid(),
+            'whatsapp_account_id' =>
+                $conversation->whatsapp_account_id,
 
-            'conversation_id' => $conversation->id,
+            'provider_message_id' =>
+                'test-' . uniqid(),
 
-            'from_phone' => $conversation->contact->phone_number,
+            'conversation_id' =>
+                $conversation->id,
 
-            'body' => 'Hello! This is a local test WhatsApp message.',
+            'from_phone' =>
+                $conversation->contact->phone_number,
 
-            'type' => 'text',
+            'body' =>
+                'Hello! This is a local test WhatsApp message.',
+
+            'type' =>
+                'text',
 
             'payload' => [
                 'test' => true,
                 'source' => 'local',
             ],
 
-            'received_at' => now(),
+            'received_at' =>
+                now(),
         ]);
 
-        // $conversation->touchIncoming();
-
-        // $this->conversation = $conversation->fresh([
-        //     'contact',
-        // ]);
 
         $conversation->touchIncoming();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Test message should immediately appear as read
+        |--------------------------------------------------------------------------
+        */
 
         $conversation->update([
             'unread_count' => 0,
         ]);
 
+
         $this->conversation = $conversation->fresh([
             'contact',
         ]);
 
+
         $this->dispatch('conversation-read');
+
 
         $this->loadMessages();
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Local Test Outgoing Message
+    |--------------------------------------------------------------------------
+    */
 
     public function createTestOutgoingMessage(): void
     {
@@ -176,45 +360,71 @@ class ChatWindow extends Component
             'contact',
         ]);
 
+        if (! $conversation) {
+            return;
+        }
+
         $message = $conversation->outgoingMessages()->create([
-            'vendor_id' => $conversation->vendor_id,
-            'campaign_id' => null,
-            'contact_id' => $conversation->contact_id,
-            'whatsapp_account_id' => $conversation->whatsapp_account_id,
 
-            'body' => 'Hello! This is a local test outgoing message.',
+            'vendor_id' =>
+                $conversation->vendor_id,
 
-            'type' => 'text',
+            'campaign_id' =>
+                null,
 
-            'status' => 'sent',
+            'contact_id' =>
+                $conversation->contact_id,
 
-            'provider_message_id' => 'local-test-' . uniqid(),
+            'whatsapp_account_id' =>
+                $conversation->whatsapp_account_id,
 
-            'sent_at' => now(),
+            'body' =>
+                'Hello! This is a local test outgoing message.',
 
-            'retry_count' => 0,
+            'type' =>
+                'text',
+
+            'status' =>
+                'sent',
+
+            'provider_message_id' =>
+                'local-test-' . uniqid(),
+
+            'sent_at' =>
+                now(),
+
+            'retry_count' =>
+                0,
         ]);
+
 
         $message->statusHistories()->create([
-            'status' => 'sent',
-            'changed_at' => now(),
+
+            'status' =>
+                'sent',
+
+            'changed_at' =>
+                now(),
         ]);
 
+
         $conversation->touchOutgoing();
+
 
         $this->conversation = $conversation->fresh([
             'contact',
         ]);
 
+
         $this->loadMessages();
     }
 
-    public function render()
-    {
-        return view(
-            'livewire.vendor.chat-window'
-        );
-    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Send Message
+    |--------------------------------------------------------------------------
+    */
 
     public function sendMessage(): void
     {
@@ -228,20 +438,47 @@ class ChatWindow extends Component
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Extra account safety check
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $this->selectedWhatsappAccountId !== null
+            &&
+            $this->conversation->whatsapp_account_id
+                !== $this->selectedWhatsappAccountId
+        ) {
+            return;
+        }
+
+
         app(SendMessageAction::class)
             ->execute(
                 $this->conversation,
                 $body
             );
 
+
         $this->messageText = '';
 
-        $this->conversation = $this->conversation->fresh([
-            'contact',
-        ]);
+
+        $this->conversation =
+            $this->conversation->fresh([
+                'contact',
+            ]);
+
 
         $this->loadMessages();
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mark Conversation As Read
+    |--------------------------------------------------------------------------
+    */
 
     public function markAsRead(): void
     {
@@ -250,6 +487,7 @@ class ChatWindow extends Component
         }
 
         if ($this->conversation->unread_count > 0) {
+
             $this->conversation->update([
                 'unread_count' => 0,
             ]);
@@ -260,43 +498,78 @@ class ChatWindow extends Component
         }
     }
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh Conversation
+    |--------------------------------------------------------------------------
+    */
+
     public function refreshConversation(): void
     {
         if (! $this->conversation) {
             return;
         }
 
+
         /*
-    |--------------------------------------------------------------------------
-    | Get latest incoming message
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Verify Conversation Still Belongs To Selected Account
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $this->selectedWhatsappAccountId !== null
+            &&
+            $this->conversation->whatsapp_account_id
+                !== $this->selectedWhatsappAccountId
+        ) {
+            $this->conversation = null;
+
+            $this->chatMessages = [];
+
+            $this->lastLoadedMessageAt = null;
+
+            return;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Latest Incoming Message
+        |--------------------------------------------------------------------------
+        */
 
         $latestIncoming = $this->conversation
             ->incomingMessages()
             ->latest('received_at')
             ->first();
 
+
         /*
-    |--------------------------------------------------------------------------
-    | Get latest outgoing message
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Get Latest Outgoing Message
+        |--------------------------------------------------------------------------
+        */
 
         $latestOutgoing = $this->conversation
             ->outgoingMessages()
             ->latest('sent_at')
             ->first();
 
+
         /*
-    |--------------------------------------------------------------------------
-    | Determine latest message timestamp
-    |--------------------------------------------------------------------------
-    */
+        |--------------------------------------------------------------------------
+        | Determine Latest Message Timestamp
+        |--------------------------------------------------------------------------
+        */
 
-        $latestIncomingAt = $latestIncoming?->received_at;
+        $latestIncomingAt =
+            $latestIncoming?->received_at;
 
-        $latestOutgoingAt = $latestOutgoing?->sent_at;
+        $latestOutgoingAt =
+            $latestOutgoing?->sent_at;
+
 
         $latestMessageAt = collect([
             $latestIncomingAt,
@@ -305,37 +578,53 @@ class ChatWindow extends Component
             ->filter()
             ->max();
 
+
         if (! $latestMessageAt) {
             return;
         }
 
-        $latestMessageAtString = $latestMessageAt->format('Y-m-d H:i:s');
+
+        $latestMessageAtString =
+            $latestMessageAt->format('Y-m-d H:i:s');
+
 
         /*
-    |--------------------------------------------------------------------------
-    | Compare with the message actually loaded in the browser
-    |--------------------------------------------------------------------------
-    |
-    | IMPORTANT:
-    |
-    | We DO NOT compare against conversations.last_message_at.
-    |
-    | last_message_at is updated by the webhook itself, so it can already
-    | contain the new message before ChatWindow loads it.
-    |
-    */
+        |--------------------------------------------------------------------------
+        | Compare With Actually Loaded Message
+        |--------------------------------------------------------------------------
+        */
 
         if (
-            $this->lastLoadedMessageAt === null ||
-            $latestMessageAtString !== $this->lastLoadedMessageAt
+            $this->lastLoadedMessageAt === null
+            ||
+            $latestMessageAtString !==
+                $this->lastLoadedMessageAt
         ) {
-            $this->conversation = $this->conversation->fresh([
-                'contact',
-            ]);
+
+            $this->conversation =
+                $this->conversation->fresh([
+                    'contact',
+                ]);
+
 
             $this->loadMessages();
 
+
             $this->markAsRead();
         }
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render
+    |--------------------------------------------------------------------------
+    */
+
+    public function render()
+    {
+        return view(
+            'livewire.vendor.chat-window'
+        );
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Meta;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MetaApiService
 {
@@ -58,26 +59,62 @@ class MetaApiService
         return $this->handleResponse($response);
     }
 
+    // protected function handleResponse($response): array
+    // {
+    //     if ($response->failed()) {
+
+    //         Log::error('META GRAPH API ERROR', [
+    //             'status' => $response->status(),
+    //             'body' => $response->json(),
+    //             'url' => $response->effectiveUri(),
+    //         ]);
+
+    //         return [
+    //             'success' => false,
+    //             'status' => $response->status(),
+    //             'error' => $response->json(),
+    //         ];
+    //     }
+
+    //     Log::info('META GRAPH API SUCCESS', [
+    //         'status' => $response->status(),
+    //         'url' => $response->effectiveUri(),
+    //         'body' => $response->json(),
+    //     ]);
+
+    //     return [
+    //         'success' => true,
+    //         'status' => $response->status(),
+    //         'data' => $response->json(),
+    //     ];
+    // }
+
     protected function handleResponse($response): array
     {
         if ($response->failed()) {
 
-            return [
-
-                'success' => false,
-
+            Log::error('META GRAPH API ERROR', [
                 'status' => $response->status(),
+                'body' => $response->json(),
+                'url' => $response->effectiveUri(),
+            ]);
 
+            return [
+                'success' => false,
+                'status' => $response->status(),
                 'error' => $response->json(),
             ];
         }
 
-        return [
-
-            'success' => true,
-
+        Log::info('META GRAPH API SUCCESS', [
             'status' => $response->status(),
+            'url' => $response->effectiveUri(),
+            'body' => $response->json(),
+        ]);
 
+        return [
+            'success' => true,
+            'status' => $response->status(),
             'data' => $response->json(),
         ];
     }
@@ -130,14 +167,23 @@ class MetaApiService
         );
     }
 
-    public function getPhoneNumbers(string $wabaId, string $accessToken): array
-    {
+    public function getPhoneNumbers(
+        string $wabaId,
+        string $accessToken
+    ): array {
 
         return $this->get(
-
             $accessToken,
-
-            "/{$wabaId}/phone_numbers"
+            "/{$wabaId}/phone_numbers",
+            [
+                'fields' => implode(',', [
+                    'id',
+                    'verified_name',
+                    'display_phone_number',
+                    'quality_rating',
+                    'code_verification_status',
+                ]),
+            ]
         );
     }
 
@@ -195,6 +241,28 @@ class MetaApiService
 
             "/{$wabaId}/subscribed_apps"
 
+        );
+    }
+
+    /**
+     * Register a WhatsApp phone number for Cloud API messaging.
+     *
+     * This registers the phone number and sets/enables
+     * the 6-digit two-step verification PIN.
+     */
+    public function registerPhone(
+        string $phoneNumberId,
+        string $accessToken,
+        string $pin
+    ): array {
+
+        return $this->post(
+            $accessToken,
+            "/{$phoneNumberId}/register",
+            [
+                'messaging_product' => 'whatsapp',
+                'pin' => $pin,
+            ]
         );
     }
 
@@ -535,5 +603,41 @@ class MetaApiService
             );
 
         return $this->handleResponse($response);
+    }
+
+    public function getWabaDetails(
+        string $wabaId,
+        string $accessToken
+    ): array {
+
+        return $this->get(
+            $accessToken,
+            "/{$wabaId}",
+            [
+                'fields' => implode(',', [
+                    'id',
+                    'name',
+                    'currency',
+                    'timezone_id',
+                    'message_template_namespace',
+                ]),
+            ]
+        );
+    }
+
+    /**
+     * Debug an access token using Meta's Graph API.
+     */
+    public function debugToken(
+        string $inputToken,
+        string $appAccessToken
+    ): array {
+        return $this->get(
+            $appAccessToken,
+            '/debug_token',
+            [
+                'input_token' => $inputToken,
+            ]
+        );
     }
 }

@@ -13,7 +13,7 @@ class SendMessageJob implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public Message $message
+        public int $messageId
     ) {
         $this->onQueue('whatsapp-sending');
     }
@@ -21,7 +21,7 @@ class SendMessageJob implements ShouldQueue
     public function handle(
         WhatsappManager $manager
     ): void {
-        $message = $this->message->fresh();
+        $message = Message::find($this->messageId);
 
         if (! $message) {
             return;
@@ -103,7 +103,7 @@ class SendMessageJob implements ShouldQueue
             $message->update([
                 'status' => MessageStatus::SENT,
                 'provider_message_id' =>
-                    $result['message_id'] ?? null,
+                $result['message_id'] ?? null,
                 'sent_at' => now(),
                 'failure_reason' => null,
             ]);
@@ -112,7 +112,6 @@ class SendMessageJob implements ShouldQueue
                 'status' => MessageStatus::SENT,
                 'changed_at' => now(),
             ]);
-
         } catch (\Throwable $e) {
 
             $this->markFailed(
@@ -160,8 +159,8 @@ class SendMessageJob implements ShouldQueue
             return json_encode(
                 $reason,
                 JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES |
-                JSON_PRETTY_PRINT
+                    JSON_UNESCAPED_SLASHES |
+                    JSON_PRETTY_PRINT
             ) ?: 'Unknown provider error.';
         }
 

@@ -6,6 +6,7 @@ use App\Enums\WhatsappAccountStatus;
 use App\Services\Meta\EmbeddedSignupService;
 use App\Services\Whatsapp\WhatsappService;
 use App\Support\UsageLimit;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -21,10 +22,10 @@ class WhatsappAccounts extends Component
     public string $name = '';
     public string $phone_number = '';
     public string $waba_id = '';
-    public string $verified_name = '';
-    public string $display_phone_number = '';
-    public string $quality_rating = '';
-    public string $verification_status = '';
+    public ?string $verified_name = '';
+    public ?string $display_phone_number = '';
+    public ?string $quality_rating = '';
+    public ?string $verification_status = '';
     public string $provider = 'meta';
     public string $phone_number_id = '';
     public string $access_token = '';
@@ -35,6 +36,9 @@ class WhatsappAccounts extends Component
     public ?int $deleteId = null;
     public bool $embeddedSignupLoading = false;
     public ?string $embeddedSignupCode = null;
+    public string $testRecipient = '';
+    public string $testMessage = '';
+    public bool $sendingTestMessage = false;
 
     protected function rules(): array
     {
@@ -45,6 +49,108 @@ class WhatsappAccounts extends Component
             'access_token' => ['required'],
         ];
     }
+
+    public function sendTestMessage(
+        WhatsappService $whatsapp
+    ): void {
+        $this->validate([
+            'testRecipient' => [
+                'required',
+                'regex:/^\+?[1-9]\d{7,14}$/',
+            ],
+            'testMessage' => [
+                'required',
+                'string',
+                'max:4096',
+            ],
+        ]);
+
+        $this->sendingTestMessage = true;
+
+        try {
+            $account = auth()
+                ->user()
+                ->vendor
+                ->whatsappAccounts()
+                ->where('is_active', true)
+                ->where('status', WhatsappAccountStatus::CONNECTED)
+                ->first();
+
+            if (! $account) {
+                session()->flash(
+                    'error',
+                    'No active connected WhatsApp account found.'
+                );
+
+                return;
+            }
+
+            Log::info('WHATSAPP TEST MESSAGE STARTED', [
+                'account_id' => $account->id,
+                'phone_number_id' => $account->phone_number_id,
+                'waba_id' => $account->waba_id,
+                'recipient' => $this->testRecipient,
+            ]);
+
+            $response = $whatsapp->sendText(
+                $account,
+                $this->testRecipient,
+                $this->testMessage
+            );
+
+            if (! ($response['success'] ?? false)) {
+                $errorMessage = data_get(
+                    $response,
+                    'error.error.message',
+                    'Unable to send WhatsApp message.'
+                );
+
+                Log::error('WHATSAPP TEST MESSAGE FAILED', [
+                    'account_id' => $account->id,
+                    'recipient' => $this->testRecipient,
+                    'response' => $response,
+                ]);
+
+                session()->flash(
+                    'error',
+                    $errorMessage
+                );
+
+                return;
+            }
+
+            Log::info('WHATSAPP TEST MESSAGE SENT', [
+                'account_id' => $account->id,
+                'recipient' => $this->testRecipient,
+                'message_id' => $response['message_id'] ?? null,
+            ]);
+
+            session()->flash(
+                'success',
+                'Test WhatsApp message sent successfully.'
+            );
+
+            $this->testRecipient = '';
+            $this->testMessage = '';
+        } catch (\Throwable $e) {
+
+            Log::error('WHATSAPP TEST MESSAGE EXCEPTION', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            session()->flash(
+                'error',
+                'Unable to send WhatsApp message: '
+                    . $e->getMessage()
+            );
+        } finally {
+
+            $this->sendingTestMessage = false;
+        }
+    }
+
     public function connectWithMeta()
     {
         $this->dispatch(
@@ -148,13 +254,13 @@ class WhatsappAccounts extends Component
 
         $this->editingId = $account->id;
         $this->name = $account->name;
-        $this->phone_number = $account->phone_number;
+        $this->display_phone_number = $account->display_phone_number;
         $this->provider = $account->provider;
         $this->phone_number_id = $account->phone_number_id ?? '';
         $this->access_token = $account->access_token ?? '';
         $this->waba_id = $account->waba_id ?? '';
         $this->showCreateModal = true;
-        $this->display_phone_number = $account->display_phone_number;
+        $this->phone_number = $account->phone_number;
         $this->verified_name = $account->verified_name;
         $this->quality_rating = $account->quality_rating;
         $this->verification_status = $account->verification_status;
@@ -220,30 +326,20 @@ class WhatsappAccounts extends Component
     {
         $this->validate([
             'phone_number_id' => ['required'],
-            'access_token'    => ['required'],
+            'access_token' => ['required'],
         ]);
 
         $this->verifyingConnection = true;
 
         try {
+            $account = new \App\Models\WhatsappAccount([
+                'phone_number_id' => $this->phone_number_id,
+                'access_token' => $this->access_token,
+            ]);
 
             $response = $whatsapp->verify($account);
 
-            $waba = $meta->discoverWaba(
-                $this->phone_number_id,
-                $this->access_token
-            );
-
-            if (
-                $waba['success']
-                && isset($waba['data']['whatsapp_business_account']['id'])
-            ) {
-                $this->waba_id =
-                    $waba['data']['whatsapp_business_account']['id'];
-            }
-
             if (! $response['success']) {
-
                 session()->flash(
                     'error',
                     data_get(
@@ -253,21 +349,27 @@ class WhatsappAccounts extends Component
                     )
                 );
 
-                $this->verifyingConnection = false;
-
                 return;
             }
 
-            $this->verified_name = $response['data']['verified_name'] ?? '';
-            if (blank($this->name)) {
+            $this->verified_name =
+                $response['data']['verified_name'] ?? '';
 
+            if (blank($this->name)) {
                 $this->name = $this->verified_name;
             }
-            $this->display_phone_number = $response['data']['display_phone_number'] ?? '';
-            //$this->waba_id = $response['data']['whatsapp_business_account']['id'] ?? '';
-            $this->phone_number = $this->display_phone_number;
-            $this->quality_rating = $response['data']['quality_rating'] ?? '';
-            $this->verification_status = $response['data']['code_verification_status'] ?? '';
+
+            $this->display_phone_number =
+                $response['data']['display_phone_number'] ?? '';
+
+            $this->phone_number =
+                $this->display_phone_number;
+
+            $this->quality_rating =
+                $response['data']['quality_rating'] ?? '';
+
+            $this->verification_status =
+                $response['data']['code_verification_status'] ?? '';
 
             session()->flash(
                 'success',
@@ -281,38 +383,100 @@ class WhatsappAccounts extends Component
                 'error',
                 $e->getMessage()
             );
-        }
+        } finally {
 
-        $this->verifyingConnection = false;
+            $this->verifyingConnection = false;
+        }
     }
 
     #[On('meta-code-received')]
-    public function receiveAuthorizationCode(string $code, EmbeddedSignupService $signup): void {
+    public function receiveAuthorizationCode(
+        string $code,
+        EmbeddedSignupService $signup,
+        ?string $wabaId = null,
+        ?string $phoneNumberId = null,
+        ?string $businessId = null
+    ): void {
+
+        Log::info('META EMBEDDED SIGNUP DATA RECEIVED', [
+            'code_received' => ! empty($code),
+            'code_length' => strlen($code),
+            'waba_id' => $wabaId,
+            'phone_number_id' => $phoneNumberId,
+            'business_id' => $businessId,
+        ]);
 
         $this->embeddedSignupLoading = true;
-        $this->embeddedSignupCode = $code;
-        $vendor = auth()->user()->vendor;
-        $result = $signup->finish(
-            $vendor,
-            $code
-        );
 
-        $this->embeddedSignupLoading = false;
+        try {
 
-        if (! $result->success) {
+            if (
+                blank($wabaId) ||
+                blank($phoneNumberId)
+            ) {
+
+                session()->flash(
+                    'error',
+                    'Meta did not return WABA ID or Phone Number ID.'
+                );
+
+                return;
+            }
+
+            $vendor = auth()->user()->vendor;
+
+            $result = $signup->finish(
+                $vendor,
+                $code,
+                $wabaId,
+                $phoneNumberId,
+                $businessId
+            );
+
+            Log::info(
+                'META EMBEDDED SIGNUP FINISH RESULT',
+                [
+                    'success' => $result->success,
+                    'error' => $result->error,
+                ]
+            );
+
+            if (! $result->success) {
+
+                session()->flash(
+                    'error',
+                    $result->error
+                );
+
+                return;
+            }
+
+            session()->flash(
+                'success',
+                'WhatsApp account connected successfully.'
+            );
+
+            $this->loadStatistics();
+        } catch (\Throwable $e) {
+
+            Log::error(
+                'META EMBEDDED SIGNUP EXCEPTION',
+                [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]
+            );
+
             session()->flash(
                 'error',
-                $result->error
+                'Unable to complete WhatsApp connection: '
+                    . $e->getMessage()
             );
-            return;
-        }
+        } finally {
 
-        session()->flash(
-            'success',
-            'WhatsApp account connected successfully.'
-        );
-        
-        $this->loadStatistics();
+            $this->embeddedSignupLoading = false;
+        }
     }
 
     public function render()

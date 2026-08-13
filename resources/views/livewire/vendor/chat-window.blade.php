@@ -5,7 +5,7 @@
     @if(!$conversation)
 
     {{-- No conversation selected --}}
-    <div class="flex-1 min-h-0 flex items-center justify-center" wire:poll.2s>
+    <div class="flex-1 min-h-0 flex items-center justify-center">
         <div class="text-center">
 
             <svg class="mx-auto w-20 h-20 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -29,7 +29,7 @@
     @else
 
     {{-- Entire Chat Window --}}
-    <div class="flex flex-col h-full min-h-0 overflow-hidden" wire:poll.2s="refreshConversation">
+    <div class="flex flex-col h-full min-h-0 overflow-hidden">
 
         {{-- ========================================================= --}}
         {{-- Conversation Header --}}
@@ -91,7 +91,7 @@
 
             @forelse($chatMessages as $message)
 
-            <div wire:key="chat-message-{{ $message['id'] }}" class="flex {{ $message['direction'] === 'outgoing'
+            <div wire:key="chat-message-{{ $message['direction'] }}-{{ $message['id'] }}" class="flex {{ $message['direction'] === 'outgoing'
                             ? 'justify-end'
                             : 'justify-start' }}">
 

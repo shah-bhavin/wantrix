@@ -6,7 +6,7 @@
         </div>
         <button wire:click="$set('showCreateModal', true)"
             class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-xl font-medium">Add Account</button>
-        
+
         <button wire:click="connectWithMeta" wire:loading.attr="disabled" wire:target="connectWithMeta"
             class="bg-green-600 text-white px-5 py-3 rounded-xl">
             <span wire:loading.remove wire:target="connectWithMeta">Connect with Meta</span>
@@ -293,5 +293,79 @@
         </div>
     </div>
     @endif
+
+
+    <div class="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+
+        <div class="mb-5">
+            <h3 class="text-lg font-semibold text-gray-900">
+                WhatsApp Test Message
+            </h3>
+
+            <p class="mt-1 text-sm text-gray-500">
+                Send a test message using the currently active WhatsApp account.
+            </p>
+        </div>
+
+        <div class="grid gap-5 md:grid-cols-2">
+
+            {{-- Recipient --}}
+            <div>
+                <label for="testRecipient" class="mb-2 block text-sm font-medium text-gray-700">
+                    Recipient WhatsApp Number
+                </label>
+
+                <input id="testRecipient" type="text" wire:model="testRecipient" placeholder="+919876543210"
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary-500 focus:ring-primary-500">
+
+                @error('testRecipient')
+                <p class="mt-1 text-sm text-red-600">
+                    {{ $message }}
+                </p>
+                @enderror
+
+                <p class="mt-1 text-xs text-gray-500">
+                    Enter the number in international format.
+                </p>
+            </div>
+
+            {{-- Message --}}
+            <div>
+                <label for="testMessage" class="mb-2 block text-sm font-medium text-gray-700">
+                    Message
+                </label>
+
+                <textarea id="testMessage" wire:model="testMessage" rows="4"
+                    placeholder="Hello! This is a test message from Wantrix."
+                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+
+                @error('testMessage')
+                <p class="mt-1 text-sm text-red-600">
+                    {{ $message }}
+                </p>
+                @enderror
+            </div>
+
+        </div>
+
+        <div class="mt-5">
+
+            <button type="button" wire:click="sendTestMessage" wire:loading.attr="disabled"
+                wire:target="sendTestMessage"
+                class="inline-flex items-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">
+
+                <span wire:loading.remove wire:target="sendTestMessage">
+                    Send Test Message
+                </span>
+
+                <span wire:loading wire:target="sendTestMessage">
+                    Sending...
+                </span>
+
+            </button>
+
+        </div>
+
+    </div>
 
 </div>

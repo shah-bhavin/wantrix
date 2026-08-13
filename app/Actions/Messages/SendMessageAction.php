@@ -52,8 +52,7 @@ class SendMessageAction
 
             $conversation->touchOutgoing();
 
-            SendMessageJob::dispatch($message);
-
+            SendMessageJob::dispatch($message->id);
             return $message;
         });
     }

@@ -1,4 +1,7 @@
 <?php 
+namespace App\Services;
+
+use App\Models\Vendor;
 
 class TenantService
 {

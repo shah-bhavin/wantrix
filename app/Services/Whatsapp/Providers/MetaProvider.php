@@ -52,15 +52,6 @@ class MetaProvider implements WhatsappProvider
         try {
             $accessToken = $this->tokens->getAccessToken($account);
         } catch (\Throwable $e) {
-            return [
-                'success' => false,
-                'error' => 'Unable to decrypt WhatsApp access token.',
-            ];
-        }
-
-        try {
-            $accessToken = $this->tokens->getAccessToken($account);
-        } catch (\Throwable $e) {
             report($e);
 
             return [

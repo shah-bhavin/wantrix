@@ -24,6 +24,7 @@ class WhatsappAccount extends Model
         'metadata',
         'quality_rating',
         'verification_status',
+        'connected_at',
         'last_verified_at',
         'last_error',
     ];
@@ -38,5 +39,19 @@ class WhatsappAccount extends Model
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function incomingMessages()
+    {
+        return $this->hasMany(IncomingMessage::class);
+    }
+    public function conversations()
+    {
+        return $this->hasMany(Conversation::class);
     }
 }

@@ -36,7 +36,7 @@
                 </div>
                 <div>
                     <div class="text-xs text-slate-500 mb-1">Verify Token</div>
-                    <input readonly value="{{ config('services.meta.verify_token') }}" class="w-full rounded-xl bg-slate-50 border-slate-200">
+                    <input readonly value="{{ config('meta.webhook_verify_token') }}" class="w-full rounded-xl bg-slate-50 border-slate-200">
                 </div>
             </div>
         </div>

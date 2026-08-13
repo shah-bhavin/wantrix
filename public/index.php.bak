@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<title>WhatsApp Embedded Signup Test</title>
+
+<!-- Facebook JavaScript SDK -->
+<script async defer crossorigin="anonymous"
+    src="https://connect.facebook.net/en_US/sdk.js">
+</script>
+
+
+</head>
+
+<body>
+
+<h2>WhatsApp Embedded Signup Test</h2>
+
+<button
+    type="button"
+    onclick="launchWhatsAppSignup()"
+    style="
+        background-color: #1877f2;
+        border: 0;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        font-family: Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        font-weight: bold;
+        height: 40px;
+        padding: 0 24px;
+    "
+>
+    Login with Facebook
+</button>
+
+
+<script>
+
+    // -----------------------------------------
+    // Facebook SDK Initialization
+    // -----------------------------------------
+
+    window.fbAsyncInit = function () {
+
+        console.log("Facebook SDK loaded");
+
+        FB.init({
+            appId: '1384333156405246',
+            autoLogAppEvents: true,
+            xfbml: true,
+            version: 'v23.0'
+        });
+
+        console.log("Facebook SDK initialized");
+    };
+
+
+    // -----------------------------------------
+    // Listen for WhatsApp Embedded Signup Events
+    // -----------------------------------------
+
+    window.addEventListener('message', function (event) {
+
+        console.log("Message received:", event);
+
+        if (!event.origin.endsWith('facebook.com')) {
+            return;
+        }
+
+        try {
+
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'WA_EMBEDDED_SIGNUP') {
+
+                console.log("WA_EMBEDDED_SIGNUP event:");
+                console.log(data);
+
+            }
+
+        } catch (error) {
+
+            console.log("Non-JSON message:");
+            console.log(event.data);
+
+        }
+
+    });
+
+
+    // -----------------------------------------
+    // Facebook Login Callback
+    // -----------------------------------------
+
+    function fbLoginCallback(response) {
+
+        console.log("Facebook Login Response:");
+        console.log(response);
+
+        if (response.authResponse) {
+
+            const code = response.authResponse.code;
+
+            console.log("Authorization Code:");
+            console.log(code);
+
+        } else {
+
+            console.log("Login cancelled or failed.");
+
+        }
+    }
+
+
+    // -----------------------------------------
+    // Launch WhatsApp Embedded Signup
+    // -----------------------------------------
+
+    function launchWhatsAppSignup() {
+
+        console.log("Launch WhatsApp Signup clicked");
+
+        if (typeof FB === 'undefined') {
+
+            console.error("Facebook SDK is NOT loaded.");
+
+            alert(
+                "Facebook SDK is not loaded. " +
+                "Please check the browser console."
+            );
+
+            return;
+        }
+
+        console.log("Opening WhatsApp Embedded Signup...");
+
+        FB.login(
+            fbLoginCallback,
+            {
+                config_id: '853378571145401',
+
+                response_type: 'code',
+
+                override_default_response_type: true,
+
+                extras: {
+                    setup: {}
+                }
+            }
+        );
+    }
+
+</script>
+
+
+</body>
+</html>

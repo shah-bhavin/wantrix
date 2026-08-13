@@ -46,11 +46,56 @@ class MetaWebhookController extends Controller
             []
         );
 
+        $statuses = data_get(
+            $payload,
+            'entry.0.changes.0.value.statuses',
+            []
+        );
+
+        /*
+|--------------------------------------------------------------------------
+| Extract Meta message status errors
+|--------------------------------------------------------------------------
+|
+| Do NOT log the complete deeply nested payload here.
+| Laravel's logger can normalize deeply nested Meta payloads and replace
+| important values with:
+|
+| "Over 9 levels deep, aborting normalization"
+|
+| Instead, extract the important fields explicitly.
+|
+*/
+
+        $statusErrors = [];
+
+        foreach ($statuses as $status) {
+
+            foreach (($status['errors'] ?? []) as $error) {
+
+                $statusErrors[] = [
+                    'message_id' => $status['id'] ?? null,
+                    'status' => $status['status'] ?? null,
+                    'recipient_id' => $status['recipient_id'] ?? null,
+
+                    'error_code' => $error['code'] ?? null,
+                    'error_title' => $error['title'] ?? null,
+                    'error_message' => $error['message'] ?? null,
+
+                    'error_data_details' =>
+                    data_get($error, 'error_data.details'),
+
+                    'error_data' => $error['error_data'] ?? null,
+                ];
+            }
+        }
+
         Log::info('META WEBHOOK RECEIVED', [
             'event' => $event,
             'phone_number_id' => $phoneNumberId,
             'message_count' => count($messages),
-            'payload' => $payload,
+            'status_count' => count($statuses),
+            'status_errors' => $statusErrors,
         ]);
 
         WebhookLog::create([
@@ -68,7 +113,6 @@ class MetaWebhookController extends Controller
                 'phone_number_id' => $phoneNumberId,
                 'message_count' => count($messages),
             ]);
-
         } catch (\Throwable $e) {
 
             Log::error('META WEBHOOK PROCESSING FAILED', [
