@@ -65,4 +65,32 @@ enum MessageStatus: string
             self::SENDING,
         ], true);
     }
+    public function icon(): string
+    {
+        return match ($this) {
+            self::PENDING => '🕓',
+            self::QUEUED => '◷',
+            self::SENDING => '◷',
+            self::SENT => '✓',
+            self::DELIVERED => '✓✓',
+            self::READ => '✓✓',
+            self::FAILED => '⚠',
+        };
+    }
+
+    public function iconColor(): string
+    {
+        return match ($this) {
+            self::PENDING,
+            self::QUEUED,
+            self::SENDING,
+            self::SENT => 'text-slate-300',
+
+            self::DELIVERED => 'text-white',
+
+            self::READ => 'text-cyan-200',
+
+            self::FAILED => 'text-red-200',
+        };
+    }
 }

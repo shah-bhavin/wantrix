@@ -67,6 +67,11 @@ return [
                 'icon' => 'chat-bubble-left-right',
             ],
             [
+                'label' => 'Chats',
+                'route' => 'vendor.inbox',
+                'icon' => 'chat-bubble-left-right',
+            ],
+            [
                 'label' => 'Media Library',
                 'route' => 'vendor.media-library',
                 'icon' => 'chat-bubble-left-right',

@@ -3,7 +3,6 @@
 namespace App\Actions\Webhooks;
 
 use App\Actions\Conversations\FindOrCreateConversationAction;
-use App\Enums\MessageType;
 use App\Models\Contact;
 use App\Models\IncomingMessage;
 use App\Models\WhatsappAccount;

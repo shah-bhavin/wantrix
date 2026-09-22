@@ -10,12 +10,10 @@ use Livewire\Component;
 class ChatWindow extends Component
 {
     public ?Conversation $conversation = null;
-
     public array $chatMessages = [];
-
     public string $messageText = '';
-
     public ?string $lastLoadedMessageAt = null;
+    public bool $showCustomerProfile = false;
 
     /*
     |--------------------------------------------------------------------------
@@ -54,7 +52,7 @@ class ChatWindow extends Component
 
             ->when(
                 $this->selectedWhatsappAccountId !== null,
-                fn ($query) => $query->where(
+                fn($query) => $query->where(
                     'whatsapp_account_id',
                     $this->selectedWhatsappAccountId
                 )
@@ -134,6 +132,8 @@ class ChatWindow extends Component
         $this->messageText = '';
 
         $this->lastLoadedMessageAt = null;
+
+        $this->showCustomerProfile = false;
     }
 
 
@@ -182,7 +182,6 @@ class ChatWindow extends Component
                     'created_at' => $message->received_at
                         ?? $message->created_at,
                 ];
-
             });
 
 
@@ -201,22 +200,17 @@ class ChatWindow extends Component
             ])
             ->get()
             ->map(function ($message) {
-
                 return [
                     'id' => $message->id,
-
                     'direction' => 'outgoing',
-
                     'type' => $message->type,
-
                     'body' => $message->body,
-
                     'media' => $message->media,
-
+                    'status' => $message->status,
+                    'failure_reason' => $message->failure_reason,
                     'created_at' => $message->sent_at
                         ?? $message->created_at,
                 ];
-
             });
 
 
@@ -248,7 +242,6 @@ class ChatWindow extends Component
 
             $this->lastLoadedMessageAt =
                 $latestMessageAt->format('Y-m-d H:i:s');
-
         }
 
 
@@ -285,28 +278,28 @@ class ChatWindow extends Component
         $conversation->incomingMessages()->create([
 
             'vendor_id' =>
-                $conversation->vendor_id,
+            $conversation->vendor_id,
 
             'contact_id' =>
-                $conversation->contact_id,
+            $conversation->contact_id,
 
             'whatsapp_account_id' =>
-                $conversation->whatsapp_account_id,
+            $conversation->whatsapp_account_id,
 
             'provider_message_id' =>
-                'test-' . uniqid(),
+            'test-' . uniqid(),
 
             'conversation_id' =>
-                $conversation->id,
+            $conversation->id,
 
             'from_phone' =>
-                $conversation->contact->phone_number,
+            $conversation->contact->phone_number,
 
             'body' =>
-                'Hello! This is a local test WhatsApp message.',
+            'Hello! This is a local test WhatsApp message.',
 
             'type' =>
-                'text',
+            'text',
 
             'payload' => [
                 'test' => true,
@@ -314,7 +307,7 @@ class ChatWindow extends Component
             ],
 
             'received_at' =>
-                now(),
+            now(),
         ]);
 
 
@@ -367,44 +360,44 @@ class ChatWindow extends Component
         $message = $conversation->outgoingMessages()->create([
 
             'vendor_id' =>
-                $conversation->vendor_id,
+            $conversation->vendor_id,
 
             'campaign_id' =>
-                null,
+            null,
 
             'contact_id' =>
-                $conversation->contact_id,
+            $conversation->contact_id,
 
             'whatsapp_account_id' =>
-                $conversation->whatsapp_account_id,
+            $conversation->whatsapp_account_id,
 
             'body' =>
-                'Hello! This is a local test outgoing message.',
+            'Hello! This is a local test outgoing message.',
 
             'type' =>
-                'text',
+            'text',
 
             'status' =>
-                'sent',
+            'sent',
 
             'provider_message_id' =>
-                'local-test-' . uniqid(),
+            'local-test-' . uniqid(),
 
             'sent_at' =>
-                now(),
+            now(),
 
             'retry_count' =>
-                0,
+            0,
         ]);
 
 
         $message->statusHistories()->create([
 
             'status' =>
-                'sent',
+            'sent',
 
             'changed_at' =>
-                now(),
+            now(),
         ]);
 
 
@@ -448,7 +441,7 @@ class ChatWindow extends Component
             $this->selectedWhatsappAccountId !== null
             &&
             $this->conversation->whatsapp_account_id
-                !== $this->selectedWhatsappAccountId
+            !== $this->selectedWhatsappAccountId
         ) {
             return;
         }
@@ -522,7 +515,7 @@ class ChatWindow extends Component
             $this->selectedWhatsappAccountId !== null
             &&
             $this->conversation->whatsapp_account_id
-                !== $this->selectedWhatsappAccountId
+            !== $this->selectedWhatsappAccountId
         ) {
             $this->conversation = null;
 
@@ -598,7 +591,7 @@ class ChatWindow extends Component
             $this->lastLoadedMessageAt === null
             ||
             $latestMessageAtString !==
-                $this->lastLoadedMessageAt
+            $this->lastLoadedMessageAt
         ) {
 
             $this->conversation =
@@ -614,6 +607,32 @@ class ChatWindow extends Component
         }
     }
 
+    /*
+|--------------------------------------------------------------------------
+| Customer Profile
+|--------------------------------------------------------------------------
+*/
+
+    public function openCustomerProfile(): void
+    {
+        if (! $this->conversation) {
+            return;
+        }
+
+        // Reload contact with tags and groups.
+        $this->conversation->load([
+            'contact.tags',
+            'contact.groups',
+        ]);
+
+        $this->showCustomerProfile = true;
+    }
+
+
+    public function closeCustomerProfile(): void
+    {
+        $this->showCustomerProfile = false;
+    }
 
     /*
     |--------------------------------------------------------------------------

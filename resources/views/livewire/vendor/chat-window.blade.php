@@ -1,8 +1,4 @@
-<div
-    wire:poll.2s="refreshConversation"
-    class="h-full flex flex-col"
->
-    @if(!$conversation)
+<div wire:poll.3s="refreshConversation" class="h-full flex flex-col relative"> @if(!$conversation)
 
     {{-- No conversation selected --}}
     <div class="flex-1 min-h-0 flex items-center justify-center">
@@ -35,26 +31,80 @@
         {{-- Conversation Header --}}
         {{-- ========================================================= --}}
 
-        <div class="shrink-0 border-b px-6 py-4 bg-white flex items-center justify-between">
+        <div class="shrink-0 border-b px-6 py-3 bg-white flex items-center justify-between">
 
-            <div>
+            {{-- Customer --}}
+            <div class="flex items-center gap-3 min-w-0">
 
-                <div class="font-semibold text-lg">
-                    {{ $conversation->contact->name }}
+                {{-- Avatar --}}
+                <div class="
+                w-11
+                h-11
+                shrink-0
+                rounded-full
+                bg-green-100
+                text-green-700
+                flex
+                items-center
+                justify-center
+                font-semibold
+                text-lg
+            ">
+                    {{ strtoupper(substr($conversation->contact->name ?? '?', 0, 1)) }}
                 </div>
 
-                <div class="text-sm text-slate-500">
-                    {{ $conversation->contact->phone_number }}
+                {{-- Customer Details --}}
+                <div class="min-w-0">
+
+                    <div class="font-semibold text-slate-900 truncate">
+                        {{ $conversation->contact->name }}
+                    </div>
+
+                    <div class="text-sm text-slate-500 truncate">
+                        {{ $conversation->contact->phone_number }}
+                    </div>
+
                 </div>
 
             </div>
 
-            {{-- Temporary Test Buttons --}}
-            <div class="flex items-center gap-2">
 
-                <button type="button" wire:click="createTestMessage" wire:loading.attr="disabled"
-                    class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl disabled:opacity-50">
+            {{-- Header Actions --}}
+            <div class="flex items-center gap-2 shrink-0">
 
+                {{-- Customer Info --}}
+                <button type="button" wire:click="openCustomerProfile" class="
+                w-10
+                h-10
+                rounded-xl
+                flex
+                items-center
+                justify-center
+                text-slate-500
+                hover:bg-slate-100
+                hover:text-slate-700
+                transition
+            " title="Customer information">
+
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                    </svg>
+
+                </button>
+
+
+                {{-- Temporary Test Buttons --}}
+                <button type="button" wire:click="createTestMessage" wire:loading.attr="disabled" class="
+                px-3
+                py-2
+                bg-amber-500
+                hover:bg-amber-600
+                text-white
+                rounded-xl
+                text-sm
+                disabled:opacity-50
+            ">
                     <span wire:loading.remove wire:target="createTestMessage">
                         Test Incoming
                     </span>
@@ -62,12 +112,19 @@
                     <span wire:loading wire:target="createTestMessage">
                         Adding...
                     </span>
-
                 </button>
 
-                <button type="button" wire:click="createTestOutgoingMessage" wire:loading.attr="disabled"
-                    class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl disabled:opacity-50">
 
+                <button type="button" wire:click="createTestOutgoingMessage" wire:loading.attr="disabled" class="
+                px-3
+                py-2
+                bg-blue-500
+                hover:bg-blue-600
+                text-white
+                rounded-xl
+                text-sm
+                disabled:opacity-50
+            ">
                     <span wire:loading.remove wire:target="createTestOutgoingMessage">
                         Test Outgoing
                     </span>
@@ -75,7 +132,6 @@
                     <span wire:loading wire:target="createTestOutgoingMessage">
                         Adding...
                     </span>
-
                 </button>
 
             </div>
@@ -86,6 +142,282 @@
         {{-- ========================================================= --}}
         {{-- SCROLLABLE MESSAGE AREA --}}
         {{-- ========================================================= --}}
+
+        {{-- ========================================================= --}}
+        {{-- CUSTOMER PROFILE DRAWER --}}
+        {{-- ========================================================= --}}
+
+        @if($showCustomerProfile)
+
+        <div class="
+            absolute
+            top-0
+            right-0
+            bottom-0
+            w-[360px]
+            max-w-full
+            bg-white
+            border-l
+            shadow-xl
+            z-30
+            flex
+            flex-col
+        ">
+
+            {{-- Drawer Header --}}
+            <div class="shrink-0 border-b px-5 py-4 flex items-center justify-between">
+
+                <div class="font-semibold text-lg">
+                    Customer Details
+                </div>
+
+                <button type="button" wire:click="closeCustomerProfile" class="
+                    w-9
+                    h-9
+                    rounded-xl
+                    flex
+                    items-center
+                    justify-center
+                    text-slate-500
+                    hover:bg-slate-100
+                    hover:text-slate-700
+                " title="Close">
+
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+
+                </button>
+
+            </div>
+
+
+            {{-- Drawer Content --}}
+            <div class="flex-1 min-h-0 overflow-y-auto p-5">
+
+                {{-- Profile --}}
+                <div class="text-center pb-6 border-b">
+
+                    <div class="
+                        mx-auto
+                        w-20
+                        h-20
+                        rounded-full
+                        bg-green-100
+                        text-green-700
+                        flex
+                        items-center
+                        justify-center
+                        text-2xl
+                        font-bold
+                    ">
+                        {{ strtoupper(substr($conversation->contact->name ?? '?', 0, 1)) }}
+                    </div>
+
+                    <div class="mt-3 font-semibold text-xl">
+                        {{ $conversation->contact->name }}
+                    </div>
+
+                    <div class="text-sm text-slate-500 mt-1">
+                        {{ $conversation->contact->phone_number }}
+                    </div>
+
+                </div>
+
+
+                {{-- Contact Information --}}
+                <div class="py-5 border-b">
+
+                    <h3 class="text-sm font-semibold text-slate-900 mb-4">
+                        Contact Information
+                    </h3>
+
+                    <div class="space-y-4">
+
+                        {{-- Phone --}}
+                        <div>
+
+                            <div class="text-xs text-slate-400">
+                                Phone
+                            </div>
+
+                            <div class="text-sm text-slate-700 mt-1">
+                                {{ $conversation->contact->phone_number ?: 'Not available' }}
+                            </div>
+
+                        </div>
+
+
+                        {{-- Email --}}
+                        <div>
+
+                            <div class="text-xs text-slate-400">
+                                Email
+                            </div>
+
+                            <div class="text-sm text-slate-700 mt-1 break-all">
+                                {{ $conversation->contact->email ?: 'Not available' }}
+                            </div>
+
+                        </div>
+
+
+                        {{-- Company --}}
+                        <div>
+
+                            <div class="text-xs text-slate-400">
+                                Company
+                            </div>
+
+                            <div class="text-sm text-slate-700 mt-1">
+                                {{ $conversation->contact->company ?: 'Not available' }}
+                            </div>
+
+                        </div>
+
+
+                        {{-- Location --}}
+                        <div>
+
+                            <div class="text-xs text-slate-400">
+                                Location
+                            </div>
+
+                            <div class="text-sm text-slate-700 mt-1">
+
+                                @php
+                                $location = collect([
+                                $conversation->contact->city,
+                                $conversation->contact->state,
+                                $conversation->contact->country,
+                                ])->filter()->implode(', ');
+                                @endphp
+
+                                {{ $location ?: 'Not available' }}
+
+                            </div>
+
+                        </div>
+
+
+                        {{-- Status --}}
+                        <div>
+
+                            <div class="text-xs text-slate-400">
+                                Status
+                            </div>
+
+                            <div class="mt-1">
+
+                                <span
+                                    class="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                    {{ ucfirst($conversation->contact->status ?? 'active') }}
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {{-- Tags --}}
+                <div class="py-5 border-b">
+
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">
+                        Tags
+                    </h3>
+
+                    @if($conversation->contact->tags->count())
+
+                    <div class="flex flex-wrap gap-2">
+
+                        @foreach($conversation->contact->tags as $tag)
+
+                        <span class="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+                            {{ $tag->name }}
+                        </span>
+
+                        @endforeach
+
+                    </div>
+
+                    @else
+
+                    <div class="text-sm text-slate-400">
+                        No tags assigned.
+                    </div>
+
+                    @endif
+
+                </div>
+
+
+                {{-- Groups --}}
+                <div class="py-5 border-b">
+
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">
+                        Groups
+                    </h3>
+
+                    @if($conversation->contact->groups->count())
+
+                    <div class="flex flex-wrap gap-2">
+
+                        @foreach($conversation->contact->groups as $group)
+
+                        <span class="px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-medium">
+                            {{ $group->name }}
+                        </span>
+
+                        @endforeach
+
+                    </div>
+
+                    @else
+
+                    <div class="text-sm text-slate-400">
+                        No groups assigned.
+                    </div>
+
+                    @endif
+
+                </div>
+
+
+                {{-- Notes --}}
+                <div class="py-5">
+
+                    <h3 class="text-sm font-semibold text-slate-900 mb-3">
+                        Notes
+                    </h3>
+
+                    @if($conversation->contact->notes)
+
+                    <div class="text-sm text-slate-600 whitespace-pre-line">
+                        {{ $conversation->contact->notes }}
+                    </div>
+
+                    @else
+
+                    <div class="text-sm text-slate-400">
+                        No notes available.
+                    </div>
+
+                    @endif
+
+                </div>
+
+            </div>
+
+        </div>
+
+        @endif
+
+
 
         <div id="chat-messages" class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-4 bg-slate-50">
 
@@ -216,6 +548,45 @@
                             {{ $message['created_at']?->format('h:i A') }}
 
                         </div>
+
+                        @if($message['direction'] === 'outgoing')
+                        <div class="flex items-center justify-end gap-1 mt-1 text-xs opacity-80">
+
+                            @php
+                            $status = $message['status'];
+
+                            if ($status instanceof \App\Enums\MessageStatus) {
+                            $status = $status->value;
+                            }
+                            @endphp
+
+                            @php
+                            $messageStatus = $message['status'];
+
+                            if ($messageStatus instanceof \App\Enums\MessageStatus) {
+                            $messageStatusEnum = $messageStatus;
+                            } else {
+                            $messageStatusEnum = \App\Enums\MessageStatus::tryFrom($messageStatus);
+                            }
+                            @endphp
+
+                            @if($messageStatusEnum)
+                            <div class="flex items-center justify-end gap-1 mt-1 text-xs opacity-80"
+                                title="{{ $messageStatusEnum->label() }}">
+                                <span class="{{ $messageStatusEnum->iconColor() }} font-semibold">
+                                    {{ $messageStatusEnum->icon() }}
+                                </span>
+
+                                @if($messageStatusEnum === \App\Enums\MessageStatus::FAILED)
+                                <span class="text-red-200">
+                                    {{ $message['failure_reason'] ?? 'Message failed' }}
+                                </span>
+                                @endif
+                            </div>
+                            @endif
+
+                        </div>
+                        @endif
 
                     </div>
 
