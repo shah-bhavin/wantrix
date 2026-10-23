@@ -6,6 +6,8 @@ use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Models\Group;
 use App\Models\Template;
+use App\Models\WhatsappAccount;
+use App\Models\WhatsappTemplate;
 use App\Support\UsageLimit;
 use Livewire\Component;
 
@@ -45,7 +47,6 @@ class Campaigns extends Component
             session()->flash('error', 'Campaign limit reached. Upgrade your plan.');
             return;
         }
-
 
         Campaign::create([
             'vendor_id' => auth()->user()->vendor_id,
