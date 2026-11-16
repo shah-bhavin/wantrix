@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
-use App\Models\CampaignActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -15,12 +14,15 @@ class Campaign extends Model
         'vendor_id',
         'group_id',
         'template_id',
+        'whatsapp_template_id',
         'whatsapp_account_id',
         'name',
         'status',
         'messages_generated_at',
         'message_delay_seconds',
         'message_type',
+        'message_body',
+
         'media_library_id',
         'scheduled_at',
         'started_at',
@@ -48,19 +50,46 @@ class Campaign extends Model
         return $this->belongsTo(Group::class);
     }
 
+    /*
+     * Legacy local template relationship.
+     * Kept temporarily for backward compatibility
+     * with existing campaigns.
+     */
     public function template()
     {
         return $this->belongsTo(Template::class);
+    }
+
+    /*
+     * Meta / WhatsApp approved template used
+     * for new campaign messages.
+     */
+    public function whatsappTemplate()
+    {
+        return $this->belongsTo(
+            WhatsappTemplate::class,
+            'whatsapp_template_id'
+        );
     }
 
     public function messages()
     {
         return $this->hasMany(Message::class);
     }
+
     public function whatsappAccount()
     {
         return $this->belongsTo(WhatsappAccount::class);
     }
+
+    public function media()
+    {
+        return $this->belongsTo(
+            MediaLibrary::class,
+            'media_library_id'
+        );
+    }
+
     public function canGenerateMessages(): bool
     {
         return
@@ -82,16 +111,12 @@ class Campaign extends Model
 
     public function canPause(): bool
     {
-        return
-            $this->status === CampaignStatus::PROCESSING;
+        return $this->status === CampaignStatus::PROCESSING;
     }
 
     public function canResume(): bool
     {
-        return in_array($this->status, [
-            CampaignStatus::PAUSED,
-            CampaignStatus::CANCELLED,
-        ]);
+        return $this->status === CampaignStatus::PAUSED;
     }
 
     public function canCancel(): bool
@@ -106,6 +131,7 @@ class Campaign extends Model
             ]
         );
     }
+
     public function canBeProcessed(): bool
     {
         return
@@ -113,6 +139,7 @@ class Campaign extends Model
             && $this->messages_generated_at !== null
             && $this->messages()->exists();
     }
+
     public function isReadyToComplete(): bool
     {
         return ! $this->messages()
@@ -123,16 +150,9 @@ class Campaign extends Model
             ])
             ->exists();
     }
+
     public function activities(): HasMany
     {
         return $this->hasMany(CampaignActivity::class);
-    }
-
-    public function media()
-    {
-        return $this->belongsTo(
-            MediaLibrary::class,
-            'media_library_id'
-        );
     }
 }

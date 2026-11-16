@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Enums\MessageStatus;
 use App\Events\Campaigns\CampaignMessagesGenerated;
 use App\Models\Campaign;
 use Illuminate\Bus\Batch;
@@ -26,47 +25,70 @@ class GenerateCampaignMessagesJob implements ShouldQueue
         $campaign = $this->campaign->fresh([
             'group',
             'template',
+            'whatsappTemplate',
+            'media',
+            'whatsappAccount',
         ]);
+
+        if (! $campaign || ! $campaign->group) {
+            return;
+        }
 
         $jobs = [];
 
         $campaign->group
             ->contacts()
             ->select('contacts.id')
-            ->chunkById(500, function ($contacts) use (&$jobs, $campaign) {
+            ->chunkById(
+                500,
+                function ($contacts) use (&$jobs, $campaign) {
 
-                $jobs[] = (new GenerateMessageChunkJob(
-                    $campaign,
-                    $contacts->pluck('id')->all()
-                ))->onQueue('campaign-generation');
-            });
+                    $jobs[] = (
+                        new GenerateMessageChunkJob(
+                            $campaign,
+                            $contacts->pluck('id')->all()
+                        )
+                    )->onQueue('campaign-generation');
+                }
+            );
 
         if (empty($jobs)) {
             $campaign->update([
                 'messages_generated_at' => now(),
             ]);
 
-            event(new CampaignMessagesGenerated($campaign));
+            event(
+                new CampaignMessagesGenerated($campaign)
+            );
 
             return;
         }
 
         Bus::batch($jobs)
             ->onQueue('campaign-generation')
-            ->then(function (Batch $batch) use ($campaign) {
+            ->then(
+                function (Batch $batch) use ($campaign) {
 
-                $campaign->update([
-                    'messages_generated_at' => now(),
-                ]);
+                    $campaign->update([
+                        'messages_generated_at' => now(),
+                    ]);
 
-                event(new CampaignMessagesGenerated(
-                    $campaign->fresh()
-                ));
-            })
-            ->catch(function (Batch $batch, Throwable $e) use ($campaign) {
+                    event(
+                        new CampaignMessagesGenerated(
+                            $campaign->fresh()
+                        )
+                    );
+                }
+            )
+            ->catch(
+                function (
+                    Batch $batch,
+                    Throwable $e
+                ) use ($campaign) {
 
-                report($e);
-            })
+                    report($e);
+                }
+            )
             ->dispatch();
     }
 }

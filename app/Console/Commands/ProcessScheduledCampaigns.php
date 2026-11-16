@@ -16,37 +16,35 @@ class ProcessScheduledCampaigns extends Command
     public function handle(
         DispatchCampaignAction $dispatchCampaign
     ): int {
-        $campaigns = Campaign::query()
+
+        Campaign::query()
             ->where('status', CampaignStatus::SCHEDULED)
             ->whereNotNull('scheduled_at')
             ->whereNotNull('messages_generated_at')
             ->where('scheduled_at', '<=', now())
-            ->get();
+            ->chunkById(100, function ($campaigns) use (
+                $dispatchCampaign
+            ) {
 
-        if ($campaigns->isEmpty()) {
+                foreach ($campaigns as $campaign) {
 
-            $this->info('No scheduled campaigns are ready.');
+                    $started = $dispatchCampaign
+                        ->execute($campaign);
 
-            return self::SUCCESS;
-        }
+                    if ($started) {
 
-        foreach ($campaigns as $campaign) {
+                        $this->info(
+                            "Campaign #{$campaign->id} started."
+                        );
 
-            $started = $dispatchCampaign->execute($campaign);
+                    } else {
 
-            if ($started) {
-
-                $this->info(
-                    "Campaign #{$campaign->id} started."
-                );
-
-            } else {
-
-                $this->line(
-                    "Campaign #{$campaign->id} was already processed."
-                );
-            }
-        }
+                        $this->line(
+                            "Campaign #{$campaign->id} was not dispatched."
+                        );
+                    }
+                }
+            });
 
         return self::SUCCESS;
     }

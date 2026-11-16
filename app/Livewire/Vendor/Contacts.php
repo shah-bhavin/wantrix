@@ -8,6 +8,7 @@ use App\Models\Contact;
 use App\Support\UsageLimit;
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Services\PhoneNumberService;
 
 class Contacts extends Component
 {
@@ -19,13 +20,13 @@ class Contacts extends Component
     public string $company = '';
     public string $status = 'active';
     public string $search = '';
-    
+
     public bool $showEditModal = false;
     public ?int $editingContactId = null;
     public ?int $deletingContactId = null;
 
     public array $selectedTags = [];
-    
+
     private function vendor()
     {
         return auth()->user()->vendor;
@@ -125,7 +126,7 @@ class Contacts extends Component
 
     public function editContact(int $id): void
     {
-        
+
         $contact = auth()->user()
             ->vendor
             ->contacts()
@@ -146,17 +147,50 @@ class Contacts extends Component
     public function updateContact(): void
     {
         $data = $this->validate();
+
         $contact = auth()->user()
             ->vendor
             ->contacts()
             ->findOrFail($this->editingContactId);
 
+        $phone = app(
+            \App\Services\PhoneNumberService::class
+        )->normalize(
+            $data['phone_number']
+        );
+
+        $duplicateExists = Contact::query()
+            ->where(
+                'vendor_id',
+                auth()->user()->vendor->id
+            )
+            ->where('phone_number', $phone)
+            ->where('id', '!=', $contact->id)
+            ->exists();
+
+        if ($duplicateExists) {
+            $this->addError(
+                'phone_number',
+                'A contact with this phone number already exists.'
+            );
+
+            return;
+        }
+
+        $data['phone_number'] = $phone;
+
         $contact->update($data);
 
-        $contact->tags()->sync($this->selectedTags);
+        $contact->tags()->sync(
+            $this->selectedTags
+        );
 
         $this->showEditModal = false;
-        session()->flash('success', 'Contact updated successfully.');
+
+        session()->flash(
+            'success',
+            'Contact updated successfully.'
+        );
     }
 
     public function confirmDelete(int $id): void
@@ -175,7 +209,4 @@ class Contacts extends Component
         $this->deletingContactId = null;
         session()->flash('success', 'Contact deleted successfully.');
     }
-
-
-
 }

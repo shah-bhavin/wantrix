@@ -27,26 +27,90 @@ class GenerateMessageChunkJob implements ShouldQueue
             return;
         }
 
-        $contacts = $this->campaign
+        /*
+        |--------------------------------------------------------------------------
+        | Refresh Campaign And Required Relations
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign = Campaign::with([
+            'group',
+            'template',
+            'whatsappTemplate',
+            'media',
+            'whatsappAccount',
+        ])->find($this->campaign->id);
+
+        if (! $campaign) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Contacts
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $campaign->group) {
+            return;
+        }
+
+        $contacts = $campaign
             ->group
             ->contacts()
             ->whereIn('contacts.id', $this->contactIds)
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Message Data Once
+        |--------------------------------------------------------------------------
+        */
+
+        $messageType = $this->resolveMessageType($campaign);
+        $messageBody = $this->resolveMessageBody($campaign);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Messages
+        |--------------------------------------------------------------------------
+        */
+
         foreach ($contacts as $contact) {
 
-            $conversation = app(FindOrCreateConversationAction::class)->execute(
+            if ($this->batch()?->cancelled()) {
+                return;
+            }
+
+            $conversation = app(
+                FindOrCreateConversationAction::class
+            )->execute(
                 $contact,
-                $this->campaign->whatsappAccount
+                $campaign->whatsappAccount
             );
 
-            $message = $this->campaign
+            /*
+            |--------------------------------------------------------------------------
+            | Prevent Duplicate Message Creation
+            |--------------------------------------------------------------------------
+            */
+
+            $alreadyExists = $campaign
+                ->messages()
+                ->where('contact_id', $contact->id)
+                ->exists();
+
+            if ($alreadyExists) {
+                continue;
+            }
+
+            $message = $campaign
                 ->messages()
                 ->create([
 
-                    'vendor_id' => $this->campaign->vendor_id,
+                    'vendor_id' => $campaign->vendor_id,
 
-                    'campaign_id' => $this->campaign->id,
+                    'campaign_id' => $campaign->id,
 
                     'conversation_id' => $conversation->id,
 
@@ -54,21 +118,51 @@ class GenerateMessageChunkJob implements ShouldQueue
 
                     'direction' => 'outgoing',
 
-                    'whatsapp_account_id' => $this->campaign->whatsapp_account_id,
+                    'whatsapp_account_id' =>
+                    $campaign->whatsapp_account_id,
 
-                    'whatsapp_template_id' => $this->campaign->template_id,
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Local / Meta Template
+                    |--------------------------------------------------------------------------
+                    */
 
-                    'media_library_id' => $this->campaign->template?->media_library_id,
+                    'whatsapp_template_id' =>
+                        $campaign->whatsapp_template_id,
 
-                    'type' => $this->campaign->template->resolvedMessageType(),
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Media
+                    |--------------------------------------------------------------------------
+                    */
 
-                    'body' => $this->campaign->template->body,
+                    'media_library_id' =>
+                    $campaign->media_library_id,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Message Content
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'type' => $messageType,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | IMPORTANT
+                    |
+                    | messages.body is NOT NULL in database.
+                    | For media-only messages we store an empty string.
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'body' => $messageBody ?? '',
 
                     'template_variables' => [],
 
                     'status' => MessageStatus::PENDING,
 
-            ]);
+                ]);
 
             $conversation->touchOutgoing();
 
@@ -79,26 +173,86 @@ class GenerateMessageChunkJob implements ShouldQueue
         }
     }
 
-    protected function resolveBody(): ?string
-    {
-        return match ($this->campaign->message_type) {
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Message Type
+    |--------------------------------------------------------------------------
+    */
 
-            MessageType::TEXT =>
-            $this->campaign->template?->body,
+    protected function resolveMessageType(
+        Campaign $campaign
+    ): MessageType {
 
-            MessageType::BUTTONS =>
-            $this->campaign->template?->body,
+        /*
+    |--------------------------------------------------------------------------
+    | Meta / WhatsApp Approved Template
+    |--------------------------------------------------------------------------
+    */
 
-            MessageType::TEMPLATE =>
-            null,
+        if ($campaign->whatsapp_template_id) {
+            return MessageType::TEMPLATE;
+        }
 
-            MessageType::IMAGE,
-            MessageType::VIDEO,
-            MessageType::DOCUMENT,
-            MessageType::AUDIO =>
-            null,
+        /*
+    |--------------------------------------------------------------------------
+    | Direct / Media Campaign
+    |--------------------------------------------------------------------------
+    */
 
-            default => '',
-        };
+        if ($campaign->message_type instanceof MessageType) {
+            return $campaign->message_type;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Safe Fallback
+    |--------------------------------------------------------------------------
+    */
+
+        return MessageType::TEXT;
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Message Body
+    |--------------------------------------------------------------------------
+    */
+
+    protected function resolveMessageBody(
+        Campaign $campaign
+    ): string {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Local Template Body
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->template) {
+            return $campaign->template->body ?? '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Direct Text Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $campaign->message_type === MessageType::TEXT ||
+            $campaign->message_type === 'text'
+        ) {
+            return $campaign->message_body ?? '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Media Campaign Caption / Body
+        |--------------------------------------------------------------------------
+        |
+        | Video, Image, Document, Audio can have empty body.
+        |--------------------------------------------------------------------------
+        */
+
+        return $campaign->message_body ?? '';
     }
 }

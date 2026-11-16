@@ -283,6 +283,59 @@ class MetaApiService
         return $this->handleResponse($response);
     }
 
+    // public function sendText(
+    //     string $phoneNumberId,
+    //     string $accessToken,
+    //     string $to,
+    //     string $body,
+    // ): array {
+
+    //     $result = $this->post(
+
+    //         $accessToken,
+
+    //         "/{$phoneNumberId}/messages",
+
+    //         [
+
+    //             'messaging_product' => 'whatsapp',
+
+    //             'recipient_type' => 'individual',
+
+    //             'to' => $to,
+
+    //             'type' => 'text',
+
+    //             'text' => [
+
+    //                 'preview_url' => false,
+
+    //                 'body' => $body,
+
+    //             ],
+
+    //         ]
+
+    //     );
+
+    //     if (! $result['success']) {
+
+    //         return $result;
+    //     }
+
+    //     return [
+
+    //         'success' => true,
+
+    //         'message_id' =>
+
+    //         $result['data']['messages'][0]['id'] ?? null,
+
+    //         'raw' => $result['data'],
+
+    //     ];
+    // }
+
     public function sendText(
         string $phoneNumberId,
         string $accessToken,
@@ -291,48 +344,56 @@ class MetaApiService
     ): array {
 
         $result = $this->post(
-
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'recipient_type' => 'individual',
-
                 'to' => $to,
-
                 'type' => 'text',
-
                 'text' => [
-
                     'preview_url' => false,
-
                     'body' => $body,
-
                 ],
-
             ]
-
         );
 
-        if (! $result['success']) {
+        return $this->formatMessageResponse($result);
+    }
 
+    /**
+     * Normalize a successful WhatsApp message API response.
+     *
+     * All message sending methods should return the same structure
+     * so callers can reliably access message_id.
+     */
+    protected function formatMessageResponse(array $result): array
+    {
+        if (! ($result['success'] ?? false)) {
             return $result;
         }
 
+        $messageId = data_get(
+            $result,
+            'data.messages.0.id'
+        );
+
+        if (blank($messageId)) {
+            Log::error('META GRAPH API RESPONSE MISSING MESSAGE ID', [
+                'response' => $result,
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Meta accepted the request but did not return a message ID.',
+                'raw' => $result['data'] ?? null,
+            ];
+        }
+
         return [
-
             'success' => true,
-
-            'message_id' =>
-
-            $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
+            'message_id' => $messageId,
+            'raw' => $result['data'] ?? null,
         ];
     }
 
@@ -402,21 +463,7 @@ class MetaApiService
 
         );
 
-        if (! $result['success']) {
-
-            return $result;
-        }
-
-        return [
-
-            'success' => true,
-
-            'message_id' =>
-            $result['data']['messages'][0]['id'] ?? null,
-
-            'raw' => $result['data'],
-
-        ];
+        return $this->formatMessageResponse($result);
     }
 
     public function sendInteractiveButtons(
@@ -426,59 +473,39 @@ class MetaApiService
         string $body,
         array $buttons,
     ): array {
-        return $this->post(
 
+        $result = $this->post(
             $accessToken,
-
             "/{$phoneNumberId}/messages",
-
             [
-
                 'messaging_product' => 'whatsapp',
-
                 'to' => $to,
-
                 'type' => 'interactive',
-
                 'interactive' => [
-
                     'type' => 'button',
-
                     'body' => [
-
                         'text' => $body,
-
                     ],
-
                     'action' => [
-
                         'buttons' => collect($buttons)
                             ->take(3)
                             ->values()
                             ->map(function ($button, $index) {
-
                                 return [
-
                                     'type' => 'reply',
-
                                     'reply' => [
-
                                         'id' => 'btn_' . $index,
-
                                         'title' => $button,
-
                                     ],
-
                                 ];
-                            }),
-
+                            })
+                            ->all(),
                     ],
-
                 ],
-
             ]
-
         );
+
+        return $this->formatMessageResponse($result);
     }
 
     public function sendImage(
@@ -487,7 +514,8 @@ class MetaApiService
         string $to,
         string $metaMediaId,
     ): array {
-        return $this->post(
+
+        $result = $this->post(
             $accessToken,
             "/{$phoneNumberId}/messages",
             [
@@ -499,6 +527,8 @@ class MetaApiService
                 ],
             ]
         );
+
+        return $this->formatMessageResponse($result);
     }
 
     public function sendDocument(
@@ -507,7 +537,8 @@ class MetaApiService
         string $to,
         string $metaMediaId,
     ): array {
-        return $this->post(
+
+        $result = $this->post(
             $accessToken,
             "/{$phoneNumberId}/messages",
             [
@@ -519,6 +550,8 @@ class MetaApiService
                 ],
             ]
         );
+
+        return $this->formatMessageResponse($result);
     }
 
     public function sendVideo(
@@ -527,7 +560,8 @@ class MetaApiService
         string $to,
         string $metaMediaId,
     ): array {
-        return $this->post(
+
+        $result = $this->post(
             $accessToken,
             "/{$phoneNumberId}/messages",
             [
@@ -539,6 +573,8 @@ class MetaApiService
                 ],
             ]
         );
+
+        return $this->formatMessageResponse($result);
     }
 
     public function sendAudio(
@@ -547,7 +583,8 @@ class MetaApiService
         string $to,
         string $metaMediaId,
     ): array {
-        return $this->post(
+
+        $result = $this->post(
             $accessToken,
             "/{$phoneNumberId}/messages",
             [
@@ -559,6 +596,8 @@ class MetaApiService
                 ],
             ]
         );
+
+        return $this->formatMessageResponse($result);
     }
 
     /**

@@ -14,22 +14,38 @@ class DispatchCampaignAction
 
         /*
         |--------------------------------------------------------------------------
-        | Only scheduled campaigns can be dispatched
+        | Campaign Must Be Ready To Dispatch
+        |--------------------------------------------------------------------------
+        |
+        | Manual dispatch:
+        | DRAFT → PROCESSING
+        |
+        | Scheduled dispatch:
+        | SCHEDULED → PROCESSING
         |--------------------------------------------------------------------------
         */
 
-        if ($campaign->status !== CampaignStatus::DRAFT) {
+        if (! in_array(
+            $campaign->status,
+            [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+            ],
+            true
+        )) {
             return false;
         }
 
-
         /*
         |--------------------------------------------------------------------------
-        | Campaign Must Have Messages
+        | Campaign Must Have Generated Messages
         |--------------------------------------------------------------------------
         */
 
-        if ($campaign->messages()->doesntExist()) {
+        if (
+            $campaign->messages_generated_at === null
+            || $campaign->messages()->doesntExist()
+        ) {
             return false;
         }
 
@@ -37,11 +53,18 @@ class DispatchCampaignAction
         |--------------------------------------------------------------------------
         | Atomic State Protection
         |--------------------------------------------------------------------------
+        |
+        | Only one process can successfully change the campaign
+        | to PROCESSING.
+        |--------------------------------------------------------------------------
         */
 
         $updated = $campaign->newQuery()
             ->whereKey($campaign->id)
-            ->where('status', CampaignStatus::DRAFT)
+            ->whereIn('status', [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+            ])
             ->update([
                 'status' => CampaignStatus::PROCESSING,
                 'started_at' => now(),

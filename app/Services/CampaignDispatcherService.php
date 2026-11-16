@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Events\CampaignStarted;
 use App\Jobs\ProcessMessageJob;
@@ -15,11 +16,38 @@ class CampaignDispatcherService
 
     public function dispatch(Campaign $campaign): void
     {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Only Processing Campaigns
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== CampaignStatus::PROCESSING) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fire Campaign Started Event
+        |--------------------------------------------------------------------------
+        */
+
         event(new CampaignStarted(
             $campaign->fresh()
         ));
 
         $delay = 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queue Only Pending Messages
+        |
+        | This is the initial campaign dispatch.
+        | retry_count must NOT be incremented here.
+        |--------------------------------------------------------------------------
+        */
 
         $campaign
             ->messages()
@@ -31,15 +59,35 @@ class CampaignDispatcherService
 
                 foreach ($messages as $message) {
 
-                    $this->statusService->change(
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Move Message To Queue
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $changed = $this->statusService->change(
                         $message,
                         MessageStatus::QUEUED,
                         [
                             'failure_reason' => null,
-                            'retry_count' => $message->retry_count + 1,
-                            'last_retried_at' => now(),
                         ]
                     );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Do Not Dispatch If Status Change Failed
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (! $changed) {
+                        continue;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Dispatch Message Job
+                    |--------------------------------------------------------------------------
+                    */
 
                     ProcessMessageJob::dispatch($message)
                         ->onQueue('messages')
@@ -47,7 +95,16 @@ class CampaignDispatcherService
                             now()->addSeconds($delay)
                         );
 
-                    $delay += $campaign->message_delay_seconds;
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Apply Campaign Message Delay
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $delay += max(
+                        0,
+                        (int) $campaign->message_delay_seconds
+                    );
                 }
             });
     }

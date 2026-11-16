@@ -12,6 +12,7 @@ class WhatsappTemplate extends Model
 
     protected $fillable = [
         'vendor_id',
+        'whatsapp_account_id',
         'meta_template_id',
         'name',
         'language',
@@ -43,6 +44,11 @@ class WhatsappTemplate extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function whatsappAccount(): BelongsTo
+    {
+        return $this->belongsTo(WhatsappAccount::class);
     }
 
     /*

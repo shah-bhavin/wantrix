@@ -5,6 +5,7 @@ namespace App\Livewire\Vendor;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Models\Contact;
+use App\Services\PhoneNumberService;
 
 class ImportContacts extends Component
 {
@@ -12,7 +13,7 @@ class ImportContacts extends Component
     public $csv;
     public int $importedCount = 0;
     public int $skippedCount = 0;
-    
+
     public array $previewRows = [];
 
     protected $rules = [
@@ -54,25 +55,48 @@ class ImportContacts extends Component
 
     public function importContacts(): void
     {
+        $this->validate();
+
         $this->importedCount = 0;
         $this->skippedCount = 0;
 
-        $handle = fopen($this->csv->getRealPath(), 'r');
-        $header = fgetcsv($handle);
+        $handle = fopen(
+            $this->csv->getRealPath(),
+            'r'
+        );
+
+        // Skip CSV header row.
+        fgetcsv($handle);
+
+        $vendorId = auth()->user()->vendor_id;
+
+        $phoneNumberService = app(
+            PhoneNumberService::class
+        );
 
         while (($row = fgetcsv($handle)) !== false) {
+
             $name = trim($row[0] ?? '');
-            $phone = trim($row[1] ?? '');
+            $rawPhone = trim($row[1] ?? '');
             $email = trim($row[2] ?? '');
             $company = trim($row[3] ?? '');
 
-            if (!$name || !$phone) {
+            if (! $name || ! $rawPhone) {
+                $this->skippedCount++;
+                continue;
+            }
+
+            $phone = $phoneNumberService->normalize(
+                $rawPhone
+            );
+
+            if (! $phone) {
                 $this->skippedCount++;
                 continue;
             }
 
             $exists = Contact::query()
-                ->where('vendor_id', auth()->user()->vendor_id)
+                ->where('vendor_id', $vendorId)
                 ->where('phone_number', $phone)
                 ->exists();
 
@@ -82,11 +106,11 @@ class ImportContacts extends Component
             }
 
             Contact::create([
-                'vendor_id' => auth()->user()->vendor_id,
+                'vendor_id' => $vendorId,
                 'name' => $name,
                 'phone_number' => $phone,
-                'email' => $email,
-                'company' => $company,
+                'email' => $email ?: null,
+                'company' => $company ?: null,
                 'status' => 'active',
             ]);
 
@@ -95,7 +119,10 @@ class ImportContacts extends Component
 
         fclose($handle);
 
-        session()->flash('success', "{$this->importedCount} contacts imported. {$this->skippedCount} skipped.");
+        session()->flash(
+            'success',
+            "{$this->importedCount} contacts imported. "
+                . "{$this->skippedCount} skipped."
+        );
     }
-
 }

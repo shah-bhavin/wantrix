@@ -105,11 +105,14 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         |--------------------------------------------------------------------------
         */
 
-        if (in_array($this->message->status, [
-            MessageStatus::SENT,
-            MessageStatus::DELIVERED,
-            MessageStatus::READ,
-        ])) {
+        if (
+            in_array($this->message->status, [
+                MessageStatus::SENT,
+                MessageStatus::DELIVERED,
+                MessageStatus::READ,
+            ])
+            || filled($this->message->provider_message_id)
+        ) {
             return;
         }
 
@@ -119,13 +122,19 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         |--------------------------------------------------------------------------
         */
 
-        $statusService->change(
+        $changed = $statusService->change(
             $this->message,
             MessageStatus::SENDING,
             [
                 'failure_reason' => null,
             ]
         );
+
+        if (! $changed) {
+            return;
+        }
+
+        $this->message->refresh();
 
         /*
 |--------------------------------------------------------------------------
@@ -211,36 +220,41 @@ class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
         );
 
         /*
-        |--------------------------------------------------------------------------
-        | Successful Message
-        |--------------------------------------------------------------------------
-        */
+|--------------------------------------------------------------------------
+| Handle Message Response
+|--------------------------------------------------------------------------
+*/
 
-        if ($response['success']) {
+        $messageId = $response['message_id'] ?? null;
+
+        if (
+            ($response['success'] ?? false)
+            && filled($messageId)
+        ) {
 
             $statusService->change(
                 $this->message,
                 MessageStatus::SENT,
                 [
                     'sent_at' => now(),
-                    'provider_message_id' => $response['message_id'],
+                    'provider_message_id' => $messageId,
                     'failure_reason' => null,
                 ]
             );
-        }
+        } else {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Failed Message
-        |--------------------------------------------------------------------------
-        */ else {
+            $failureReason = $response['error']
+                ?? (
+                    ($response['success'] ?? false)
+                    ? 'Meta accepted the message request but no provider message ID was returned.'
+                    : 'Message failed to send.'
+                );
 
             $statusService->change(
                 $this->message,
                 MessageStatus::FAILED,
                 [
-                    'failure_reason' => $response['error']
-                        ?? 'Message failed to send.',
+                    'failure_reason' => $failureReason,
                 ]
             );
         }

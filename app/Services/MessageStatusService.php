@@ -4,177 +4,112 @@ namespace App\Services;
 
 use App\Enums\MessageStatus;
 use App\Models\Message;
+use Illuminate\Support\Facades\DB;
 
 class MessageStatusService
 {
+    /**
+     * Change message status safely.
+     *
+     * The message update and its status history entry are
+     * committed together, or neither is committed.
+     */
     public function change(
         Message $message,
         MessageStatus $status,
         array $attributes = []
     ): bool {
+        return DB::transaction(function () use (
+            $message,
+            $status,
+            $attributes
+        ): bool {
+            $lockedMessage = Message::query()
+                ->whereKey($message->getKey())
+                ->lockForUpdate()
+                ->first();
 
-        $message->refresh();
-
-        $oldStatus = $message->status;
-
-        /*
-    |--------------------------------------------------------------------------
-    | Do not move backwards
-    |--------------------------------------------------------------------------
-    */
-
-        $statusOrder = [
-            MessageStatus::PENDING->value => 1,
-            MessageStatus::SENDING->value => 2,
-            MessageStatus::SENT->value => 3,
-            MessageStatus::DELIVERED->value => 4,
-            MessageStatus::READ->value => 5,
-            MessageStatus::FAILED->value => 99,
-        ];
-
-        if (
-            $oldStatus instanceof MessageStatus &&
-            isset($statusOrder[$oldStatus->value], $statusOrder[$status->value]) &&
-            $statusOrder[$status->value] < $statusOrder[$oldStatus->value]
-        ) {
-            return false;
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Same status
-    |--------------------------------------------------------------------------
-    |
-    | Update additional attributes if supplied,
-    | but do NOT create another history record.
-    |
-    */
-
-        if (
-            $oldStatus instanceof MessageStatus &&
-            $oldStatus->value === $status->value
-        ) {
-            if ($attributes) {
-                $message->update($attributes);
+            if (! $lockedMessage) {
+                return false;
             }
 
+            $oldStatus = $lockedMessage->status;
+
+            // Same status: update attributes without creating
+            // a duplicate status-history entry.
+            if ($oldStatus === $status) {
+                if (! empty($attributes)) {
+                    $lockedMessage->update($attributes);
+                }
+
+                $message->refresh();
+
+                return true;
+            }
+
+            // Never permit an unknown or invalid transition.
+            if (
+                ! $oldStatus instanceof MessageStatus
+                || ! $this->canTransition($oldStatus, $status)
+            ) {
+                return false;
+            }
+
+            $lockedMessage->update([
+                ...$attributes,
+                'status' => $status,
+            ]);
+
+            $lockedMessage->statusHistories()->create([
+                'status' => $status,
+                'changed_at' => now(),
+            ]);
+
+            // Keep the caller's model instance up to date.
+            $message->refresh();
+
             return true;
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Update message
-    |--------------------------------------------------------------------------
-    */
-
-        $message->update([
-            ...$attributes,
-            'status' => $status,
-        ]);
-
-        /*
-    |--------------------------------------------------------------------------
-    | Create history
-    |--------------------------------------------------------------------------
-    */
-
-        $message->statusHistories()->create([
-            'status' => $status,
-            'changed_at' => now(),
-        ]);
-
-        return true;
+        }, 3);
     }
 
     /**
-     * Determine whether a message can move from one status to another.
+     * Validate the permitted message status transitions.
      */
     protected function canTransition(
         MessageStatus $from,
         MessageStatus $to
     ): bool {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Explicit WhatsApp message state machine
-        |--------------------------------------------------------------------------
-        |
-        | PENDING
-        |   ↓
-        | SENDING
-        |   ↓
-        | SENT
-        |   ↓
-        | DELIVERED
-        |   ↓
-        | READ
-        |
-        | FAILED can occur while a message is being processed/sent.
-        |
-        */
-
         return match ($from) {
+            MessageStatus::PENDING => in_array($to, [
+                MessageStatus::QUEUED,
+                MessageStatus::SENDING,
+                MessageStatus::FAILED,
+            ], true),
 
-            MessageStatus::PENDING => in_array(
-                $to,
-                [
-                    MessageStatus::SENDING,
-                    MessageStatus::FAILED,
-                ],
-                true
-            ),
+            MessageStatus::QUEUED => in_array($to, [
+                MessageStatus::SENDING,
+                MessageStatus::FAILED,
+            ], true),
 
-            MessageStatus::SENDING => in_array(
-                $to,
-                [
-                    MessageStatus::SENT,
-                    MessageStatus::FAILED,
-                ],
-                true
-            ),
+            MessageStatus::SENDING => in_array($to, [
+                MessageStatus::QUEUED,
+                MessageStatus::SENT,
+                MessageStatus::FAILED,
+            ], true),
 
-            MessageStatus::SENT => in_array(
-                $to,
-                [
-                    MessageStatus::DELIVERED,
-                    MessageStatus::FAILED,
-                ],
-                true
-            ),
+            MessageStatus::SENT => in_array($to, [
+                MessageStatus::DELIVERED,
+                MessageStatus::FAILED,
+            ], true),
 
-            MessageStatus::DELIVERED => in_array(
-                $to,
-                [
-                    MessageStatus::READ,
-                    MessageStatus::FAILED,
-                ],
-                true
-            ),
+            MessageStatus::DELIVERED => in_array($to, [
+                MessageStatus::READ,
+                MessageStatus::FAILED,
+            ], true),
 
-            /*
-            |--------------------------------------------------------------------------
-            | READ is terminal
-            |--------------------------------------------------------------------------
-            |
-            | Once Meta has confirmed READ, an old webhook must not move
-            | the message backwards.
-            |
-            */
+            MessageStatus::FAILED => $to === MessageStatus::QUEUED,
 
             MessageStatus::READ => false,
-
-            /*
-            |--------------------------------------------------------------------------
-            | FAILED is terminal
-            |--------------------------------------------------------------------------
-            |
-            | A failed message cannot later become SENT / DELIVERED / READ.
-            |
-            */
-
-            MessageStatus::FAILED => false,
-
-            default => false,
         };
     }
 }

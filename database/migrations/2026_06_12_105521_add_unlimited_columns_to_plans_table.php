@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -6,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('plans', function (Blueprint $table) {
@@ -27,27 +25,18 @@ return new class extends Migration
             $table->boolean('is_unlimited_campaigns')
                 ->default(false)
                 ->after('max_campaigns_per_month');
-
-            $table->integer('trial_days')
-                ->default(0)
-                ->after('yearly_price');
-
         });
-
-        
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('plans', function (Blueprint $table) {
-            $table->dropColumn('is_unlimited_users');
-            $table->dropColumn('is_unlimited_contacts');
-            $table->dropColumn('is_unlimited_whatsapp_numbers');
-            $table->dropColumn('is_unlimited_campaigns');
-            $table->dropColumn('trial_days');
+            $table->dropColumn([
+                'is_unlimited_users',
+                'is_unlimited_contacts',
+                'is_unlimited_whatsapp_numbers',
+                'is_unlimited_campaigns',
+            ]);
         });
     }
 };
