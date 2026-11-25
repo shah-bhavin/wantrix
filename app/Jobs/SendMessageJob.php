@@ -4,53 +4,67 @@ namespace App\Jobs;
 
 use App\Enums\MessageStatus;
 use App\Models\Message;
+use App\Services\MessageStatusService;
 use App\Services\Whatsapp\WhatsappManager;
+use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SendMessageJob implements ShouldQueue
 {
-    use Queueable;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public int $messageId
-    ) {
+    public int $tries = 1;
+
+    public bool $failOnTimeout = true;
+
+    public int $timeout = 120;
+
+    public function __construct(public int $messageId)
+    {
         $this->onQueue('whatsapp-sending');
     }
 
     public function handle(
-        WhatsappManager $manager
+        WhatsappManager $manager,
+        MessageStatusService $statusService
     ): void {
-        $message = Message::find($this->messageId);
+        $message = Message::query()
+            ->with(['whatsappAccount', 'campaign.whatsappAccount'])
+            ->find($this->messageId);
 
         if (! $message) {
             return;
         }
 
-        if ($message->status !== MessageStatus::PENDING) {
+        if (in_array($message->status, [
+            MessageStatus::SENDING,
+            MessageStatus::SENT,
+            MessageStatus::DELIVERED,
+            MessageStatus::READ,
+            MessageStatus::FAILED,
+        ], true) || filled($message->provider_message_id)) {
             return;
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Mark as SENDING
-        |--------------------------------------------------------------------------
-        */
+         * Atomic claim: only one job can move this message to SENDING.
+         */
+        $claimed = $statusService->change(
+            $message,
+            MessageStatus::SENDING,
+            ['failure_reason' => null]
+        );
 
-        $message->update([
-            'status' => MessageStatus::SENDING,
-        ]);
+        if (! $claimed) {
+            return;
+        }
 
-        $message->statusHistories()->create([
-            'status' => MessageStatus::SENDING,
-            'changed_at' => now(),
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | WhatsApp Account
-        |--------------------------------------------------------------------------
-        */
+        $message->refresh();
 
         $account = $message->whatsappAccount;
 
@@ -59,115 +73,74 @@ class SendMessageJob implements ShouldQueue
         }
 
         if (! $account) {
-            $this->markFailed(
+            $statusService->change(
                 $message,
-                'No WhatsApp account associated with this message.'
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' => 'No WhatsApp account associated with this message.',
+                ]
             );
 
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Send Message
-        |--------------------------------------------------------------------------
-        */
-
         try {
             $provider = $manager->account($account);
-
-            $result = $provider->send($message);
-
-            /*
-            |--------------------------------------------------------------------------
-            | Provider Failure
-            |--------------------------------------------------------------------------
-            */
-
-            if (! ($result['success'] ?? false)) {
-
-                $this->markFailed(
-                    $message,
-                    $result['error'] ?? 'WhatsApp provider failed.'
-                );
-
-                return;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Success
-            |--------------------------------------------------------------------------
-            */
-
-            $message->update([
-                'status' => MessageStatus::SENT,
-                'provider_message_id' =>
-                $result['message_id'] ?? null,
-                'sent_at' => now(),
-                'failure_reason' => null,
+            $response = $provider->send($message);
+        } catch (Throwable $exception) {
+            Log::critical('Direct WhatsApp delivery outcome is unknown.', [
+                'message_id' => $message->id,
+                'exception' => $exception->getMessage(),
             ]);
 
-            $message->statusHistories()->create([
-                'status' => MessageStatus::SENT,
-                'changed_at' => now(),
-            ]);
-        } catch (\Throwable $e) {
+            // Do not retry an ambiguous provider request.
+            return;
+        }
 
-            $this->markFailed(
+        $providerMessageId = $response['message_id'] ?? null;
+
+        if (
+            ($response['success'] ?? false)
+            && filled($providerMessageId)
+        ) {
+            $statusService->change(
                 $message,
-                $e->getMessage()
+                MessageStatus::SENT,
+                [
+                    'provider_message_id' => $providerMessageId,
+                    'sent_at' => now(),
+                    'failure_reason' => null,
+                ]
             );
 
-            throw $e;
+            return;
         }
+
+        if ($response['success'] ?? false) {
+            // Success without a provider ID is an ambiguous result.
+            Log::critical('Direct WhatsApp request succeeded without provider message ID.', [
+                'message_id' => $message->id,
+            ]);
+
+            return;
+        }
+
+        $statusService->change(
+            $message,
+            MessageStatus::FAILED,
+            [
+                'failure_reason' => $response['error']
+                    ?? 'WhatsApp provider rejected the message.',
+            ]
+        );
     }
 
-    /**
-     * Mark message as failed.
-     *
-     * Meta API errors can be either strings or arrays.
-     */
-    protected function markFailed(
-        Message $message,
-        mixed $reason
-    ): void {
-
-        $reason = $this->normalizeFailureReason($reason);
-
-        $message->update([
-            'status' => MessageStatus::FAILED,
-            'failure_reason' => $reason,
-        ]);
-
-        $message->statusHistories()->create([
-            'status' => MessageStatus::FAILED,
-            'changed_at' => now(),
-        ]);
-    }
-
-    /**
-     * Convert provider/API errors into a readable string.
-     */
-    protected function normalizeFailureReason(mixed $reason): string
+    public function failed(Throwable $exception): void
     {
-        if (is_string($reason)) {
-            return $reason;
-        }
-
-        if (is_array($reason)) {
-            return json_encode(
-                $reason,
-                JSON_UNESCAPED_UNICODE |
-                    JSON_UNESCAPED_SLASHES |
-                    JSON_PRETTY_PRINT
-            ) ?: 'Unknown provider error.';
-        }
-
-        if ($reason instanceof \Throwable) {
-            return $reason->getMessage();
-        }
-
-        return (string) $reason;
+        // Keep the message status unchanged for safe reconciliation.
+        Log::critical('Direct WhatsApp job failed; delivery requires reconciliation.', [
+            'message_id' => $this->messageId,
+            'exception' => $exception->getMessage(),
+        ]);
     }
 }

@@ -32,6 +32,7 @@ class MetaApiService
         return Http::withToken($token)
             ->acceptJson()
             ->asJson()
+            ->connectTimeout(10)
             ->timeout(30);
     }
 
@@ -59,63 +60,35 @@ class MetaApiService
         return $this->handleResponse($response);
     }
 
-    // protected function handleResponse($response): array
-    // {
-    //     if ($response->failed()) {
-
-    //         Log::error('META GRAPH API ERROR', [
-    //             'status' => $response->status(),
-    //             'body' => $response->json(),
-    //             'url' => $response->effectiveUri(),
-    //         ]);
-
-    //         return [
-    //             'success' => false,
-    //             'status' => $response->status(),
-    //             'error' => $response->json(),
-    //         ];
-    //     }
-
-    //     Log::info('META GRAPH API SUCCESS', [
-    //         'status' => $response->status(),
-    //         'url' => $response->effectiveUri(),
-    //         'body' => $response->json(),
-    //     ]);
-
-    //     return [
-    //         'success' => true,
-    //         'status' => $response->status(),
-    //         'data' => $response->json(),
-    //     ];
-    // }
 
     protected function handleResponse($response): array
     {
-        if ($response->failed()) {
+        $data = $response->json() ?? [];
 
+        if ($response->failed()) {
             Log::error('META GRAPH API ERROR', [
                 'status' => $response->status(),
-                'body' => $response->json(),
-                'url' => $response->effectiveUri(),
+                'error_code' => data_get($data, 'error.code'),
+                'error_subcode' => data_get($data, 'error.error_subcode'),
+                'error_type' => data_get($data, 'error.type'),
+                'fbtrace_id' => data_get($data, 'error.fbtrace_id'),
             ]);
 
             return [
                 'success' => false,
                 'status' => $response->status(),
-                'error' => $response->json(),
+                'error' => $data,
             ];
         }
 
         Log::info('META GRAPH API SUCCESS', [
             'status' => $response->status(),
-            'url' => $response->effectiveUri(),
-            'body' => $response->json(),
         ]);
 
         return [
             'success' => true,
             'status' => $response->status(),
-            'data' => $response->json(),
+            'data' => $data,
         ];
     }
 
@@ -220,14 +193,69 @@ class MetaApiService
         string $wabaId,
         string $accessToken,
     ): array {
+        $allTemplates = [];
+        $after = null;
+        $seenCursors = [];
+        $lastResult = null;
 
-        return $this->get(
+        for ($page = 0; $page < 100; $page++) {
+            $query = ['limit' => 100];
 
-            $accessToken,
+            if ($after !== null) {
+                $query['after'] = $after;
+            }
 
-            "/{$wabaId}/message_templates"
+            $result = $this->get(
+                $accessToken,
+                "/{$wabaId}/message_templates",
+                $query
+            );
 
-        );
+            if (! ($result['success'] ?? false)) {
+                return $result;
+            }
+
+            $lastResult = $result;
+
+            $pageTemplates = data_get(
+                $result,
+                'data.data',
+                []
+            );
+
+            $allTemplates = array_merge(
+                $allTemplates,
+                $pageTemplates
+            );
+
+            $nextCursor = data_get(
+                $result,
+                'data.paging.cursors.after'
+            );
+
+            if (blank($nextCursor) || isset($seenCursors[$nextCursor])) {
+                break;
+            }
+
+            $seenCursors[$nextCursor] = true;
+            $after = $nextCursor;
+
+            if ($page === 99) {
+                return [
+                    'success' => false,
+                    'error' => 'Template pagination safety limit reached.',
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'status' => $lastResult['status'] ?? 200,
+            'data' => [
+                'data' => $allTemplates,
+                'paging' => $lastResult['data']['paging'] ?? [],
+            ],
+        ];
     }
 
     /**
@@ -373,19 +401,16 @@ class MetaApiService
             return $result;
         }
 
-        $messageId = data_get(
-            $result,
-            'data.messages.0.id'
-        );
+        $messageId = data_get($result, 'data.messages.0.id');
 
         if (blank($messageId)) {
-            Log::error('META GRAPH API RESPONSE MISSING MESSAGE ID', [
-                'response' => $result,
+            Log::error('META RESPONSE MISSING MESSAGE ID', [
+                'status' => $result['status'] ?? null,
             ]);
 
             return [
                 'success' => false,
-                'error' => 'Meta accepted the request but did not return a message ID.',
+                'error' => 'Meta did not return a message ID.',
                 'raw' => $result['data'] ?? null,
             ];
         }
@@ -604,45 +629,100 @@ class MetaApiService
      * Upload media.
      */
     public function uploadMedia(
-
         string $phoneNumberId,
-
         string $accessToken,
-
         string $path,
-
         string $mimeType,
-
     ): array {
+        if (! is_file($path) || ! is_readable($path)) {
+            return [
+                'success' => false,
+                'error' => 'Media file is missing or unreadable.',
+            ];
+        }
 
-        $response = Http::withToken($accessToken)
+        $stream = fopen($path, 'r');
 
-            ->attach(
+        if ($stream === false) {
+            return [
+                'success' => false,
+                'error' => 'Unable to open media file.',
+            ];
+        }
 
-                'file',
+        try {
+            $response = Http::withToken($accessToken)
+                ->acceptJson()
+                ->connectTimeout(15)
+                ->timeout(120)
+                ->attach(
+                    'file',
+                    $stream,
+                    basename($path),
+                    ['Content-Type' => $mimeType]
+                )
+                ->post(
+                    "{$this->baseUrl}/{$phoneNumberId}/media",
+                    [
+                        'messaging_product' => 'whatsapp',
+                        'type' => $mimeType,
+                    ]
+                );
 
-                fopen($path, 'r'),
-
-                basename($path)
-
-            )
-
-            ->post(
-
-                "{$this->baseUrl}/{$phoneNumberId}/media",
-
-                [
-
-                    'messaging_product' => 'whatsapp',
-
-                    'type' => $mimeType,
-
-                ]
-
-            );
-
-        return $this->handleResponse($response);
+            return $this->handleResponse($response);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
     }
+
+
+
+    public function uploadMediaStream(
+        string $phoneNumberId,
+        string $accessToken,
+        $stream,
+        string $filename,
+        string $mimeType,
+    ): array {
+        if (! is_resource($stream)) {
+            return [
+                'success' => false,
+                'error' => 'Invalid media stream.',
+            ];
+        }
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->acceptJson()
+                ->connectTimeout(15)
+                ->timeout(120)
+                ->attach(
+                    'file',
+                    $stream,
+                    basename($filename),
+                    ['Content-Type' => $mimeType]
+                )
+                ->post(
+                    "{$this->baseUrl}/{$phoneNumberId}/media",
+                    [
+                        'messaging_product' => 'whatsapp',
+                        'type' => $mimeType,
+                    ]
+                );
+
+            return $this->handleResponse($response);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'success' => false,
+                'error' => 'Meta media upload request failed.',
+            ];
+        }
+    }
+
 
     public function getWabaDetails(
         string $wabaId,

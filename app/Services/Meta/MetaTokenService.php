@@ -3,54 +3,56 @@
 namespace App\Services\Meta;
 
 use App\Models\WhatsappAccount;
+use RuntimeException;
 
 class MetaTokenService
 {
     public function __construct(
         protected MetaApiService $meta
-    ) {
-    }
+    ) {}
 
-    /**
-     * Get the decrypted access token for a WhatsApp account.
-     */
     public function getAccessToken(WhatsappAccount $account): string
     {
-        return $account->access_token;
+        $account->refresh();
+
+        $token = $account->access_token;
+
+        if (! is_string($token) || trim($token) === '') {
+            throw new RuntimeException(
+                'WhatsApp access token is missing. Reconnect the WhatsApp account.'
+            );
+        }
+
+        return trim($token);
     }
 
-    /**
-     * Encrypt and store a WhatsApp access token.
-     */
     public function storeAccessToken(
         WhatsappAccount $account,
         string $token
     ): void {
-        $account->update([
-            'access_token' => $token,
-        ]);
+        if (trim($token) === '') {
+            throw new RuntimeException('Cannot store an empty Meta access token.');
+        }
+
+        $account->access_token = trim($token);
+        $account->save();
     }
 
-    /**
-     * Debug an access token using Meta's Graph API.
-     */
     public function debugToken(string $token): array
     {
         $appId = config('meta.app_id');
         $appSecret = config('meta.app_secret');
 
-        if (!$appId || !$appSecret) {
+        if (blank($appId) || blank($appSecret) || blank($token)) {
             return [
                 'success' => false,
-                'error' => 'Meta App ID or App Secret is not configured.',
+                'error' => 'Meta App credentials or access token are missing.',
             ];
         }
 
-        $appAccessToken = $appId . '|' . $appSecret;
-
         return $this->meta->debugToken(
             $token,
-            $appAccessToken
+            $appId . '|' . $appSecret
         );
     }
 }

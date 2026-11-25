@@ -1,138 +1,89 @@
 <?php
 
-namespace App\Actions\Meta;
+namespace App\Services\Whatsapp;
 
 use App\Models\Message;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
-class ProcessWebhookAction
+class TemplateVariableService
 {
-    public function execute(array $payload): void
+    public function resolve(Message $message): array
     {
-        $value = $payload['entry'][0]['changes'][0]['value'] ?? [];
+        $message->loadMissing([
+            'whatsappTemplate',
+            'contact',
+        ]);
 
-        $statuses = $value['statuses'] ?? [];
+        $template = $message->whatsappTemplate;
 
-        foreach ($statuses as $status) {
-
-            $providerMessageId = $status['id'] ?? null;
-
-            if (blank($providerMessageId)) {
-                continue;
-            }
-
-            $message = Message::where(
-                'provider_message_id',
-                $providerMessageId
-            )->first();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Extract Meta error
-            |--------------------------------------------------------------------------
-            */
-
-            $metaError = $status['errors'][0] ?? null;
-
-            if ($metaError) {
-
-                $errorCode = $metaError['code'] ?? null;
-
-                $errorTitle = $metaError['title'] ?? null;
-
-                $errorMessage = $metaError['message'] ?? null;
-
-                $errorDetails =
-                    data_get(
-                        $metaError,
-                        'error_data.details'
-                    );
-
-                Log::error(
-                    'WHATSAPP MESSAGE DELIVERY FAILED',
-                    [
-                        'provider_message_id' =>
-                        $providerMessageId,
-
-                        'recipient_id' =>
-                        $status['recipient_id'] ?? null,
-
-                        'error_code' =>
-                        $errorCode,
-
-                        'error_title' =>
-                        $errorTitle,
-
-                        'error_message' =>
-                        $errorMessage,
-
-                        'error_details' =>
-                        $errorDetails,
-                    ]
-                );
-
-                /*
-                |--------------------------------------------------------------------------
-                | Update our local message if it exists
-                |--------------------------------------------------------------------------
-                */
-
-                if ($message) {
-
-                    $message->update([
-                        'status' => 'failed',
-                    ]);
-                }
-
-                continue;
-            }
-
-            /*
-            |--------------------------------------------------------------------------
-            | Normal message status
-            |--------------------------------------------------------------------------
-            */
-
-            if (!$message) {
-                continue;
-            }
-
-            switch ($status['status'] ?? null) {
-
-                case 'sent':
-
-                    $message->update([
-                        'status' => 'sent',
-                    ]);
-
-                    break;
-
-                case 'delivered':
-
-                    $message->update([
-                        'status' => 'delivered',
-                        'delivered_at' => now(),
-                    ]);
-
-                    break;
-
-                case 'read':
-
-                    $message->update([
-                        'status' => 'read',
-                        'read_at' => now(),
-                    ]);
-
-                    break;
-
-                case 'failed':
-
-                    $message->update([
-                        'status' => 'failed',
-                    ]);
-
-                    break;
-            }
+        if (! $template) {
+            throw ValidationException::withMessages([
+                'whatsapp_template_id' => 'WhatsApp template is missing.',
+            ]);
         }
+
+        $components = $template->components ?? [];
+
+        $body = collect($components)->first(
+            fn ($component) => strtoupper($component['type'] ?? '') === 'BODY'
+        );
+
+        $bodyText = $body['text'] ?? '';
+
+        preg_match_all('/\{\{(\d+)\}\}/', $bodyText, $matches);
+
+        $placeholderNumbers = array_values(array_unique(
+            array_map('intval', $matches[1] ?? [])
+        ));
+
+        sort($placeholderNumbers);
+
+        if ($placeholderNumbers === []) {
+            return [];
+        }
+
+        $saved = $message->template_variables ?? [];
+
+        if (! is_array($saved)) {
+            $saved = [];
+        }
+
+        $variables = [];
+
+        foreach ($placeholderNumbers as $number) {
+            $value = $this->savedValue($saved, $number);
+
+            if ($value === null) {
+                $value = match ($number) {
+                    1 => $message->contact?->name,
+                    2 => $message->contact?->phone_number,
+                    default => null,
+                };
+            }
+
+            if ($value === null || trim((string) $value) === '') {
+                throw ValidationException::withMessages([
+                    'template_variables' => "Template variable {{$number}} is missing.",
+                ]);
+            }
+
+            $variables[] = (string) $value;
+        }
+
+        return $variables;
+    }
+
+    protected function savedValue(array $saved, int $number): mixed
+    {
+        // Supports both [value1, value2] and ["1" => value1] formats.
+        if (array_key_exists((string) $number, $saved)) {
+            return $saved[(string) $number];
+        }
+
+        if (array_key_exists($number - 1, $saved)) {
+            return $saved[$number - 1];
+        }
+
+        return null;
     }
 }

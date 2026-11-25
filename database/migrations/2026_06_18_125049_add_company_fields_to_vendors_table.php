@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -17,7 +18,6 @@ return new class extends Migration
             $table->string('state')->nullable()->after('city');
             $table->string('country')->nullable()->after('state');
             $table->string('postal_code')->nullable();
-            $table->string('gst_number')->nullable();
             $table->string('timezone')->default('Asia/Kolkata');
         });
     }
@@ -33,7 +33,6 @@ return new class extends Migration
             $table->dropColumn('state');
             $table->dropColumn('country');
             $table->dropColumn('postal_code');
-            $table->dropColumn('gst_number');
             $table->dropColumn('timezone');
         });
     }

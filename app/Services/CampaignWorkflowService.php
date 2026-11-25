@@ -2,13 +2,18 @@
 
 namespace App\Services;
 
+use App\Actions\Campaigns\CancelCampaignAction;
+use App\Actions\Campaigns\DispatchCampaignAction;
 use App\Actions\Campaigns\GenerateCampaignMessagesAction;
+use App\Actions\Campaigns\PauseCampaignAction;
+use App\Actions\Campaigns\ResumeCampaignAction;
 use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Events\CampaignCompleted;
-use App\Events\CampaignPaused;
 use App\Jobs\ProcessMessageJob;
 use App\Models\Campaign;
+use App\Models\Message;
+use Illuminate\Support\Facades\DB;
 
 class CampaignWorkflowService
 {
@@ -19,7 +24,9 @@ class CampaignWorkflowService
     public function generateMessages(Campaign $campaign): void
     {
         if (! $campaign->canGenerateMessages()) {
-            throw new \Exception('Messages already generated.');
+            throw new \RuntimeException(
+                'Messages already generated or campaign is not a draft.'
+            );
         }
 
         app(GenerateCampaignMessagesAction::class)
@@ -28,197 +35,41 @@ class CampaignWorkflowService
 
     public function send(Campaign $campaign): void
     {
-        //
+        app(DispatchCampaignAction::class)->execute($campaign);
     }
 
     public function pause(Campaign $campaign): void
     {
-        $campaign->refresh();
-
-        if (! $campaign->status->canPause()) {
-            return;
-        }
-
-        $updated = $campaign->newQuery()
-            ->whereKey($campaign->id)
-            ->where('status', CampaignStatus::PROCESSING)
-            ->update([
-                'status' => CampaignStatus::PAUSED,
-            ]);
-
-        if ($updated === 1) {
-            event(new CampaignPaused($campaign->fresh()));
-        }
+        app(PauseCampaignAction::class)->execute($campaign);
     }
 
     public function resume(Campaign $campaign): void
     {
-        $campaign->refresh();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Only paused campaigns can be resumed
-        |--------------------------------------------------------------------------
-        */
-
-        if ($campaign->status !== CampaignStatus::PAUSED) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Atomic State Transition
-        |--------------------------------------------------------------------------
-        */
-
-        $updated = $campaign->newQuery()
-            ->whereKey($campaign->id)
-            ->where('status', CampaignStatus::PAUSED)
-            ->update([
-                'status' => CampaignStatus::PROCESSING,
-            ]);
-
-        if ($updated !== 1) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Queue Pending Messages
-        |
-        | Queued jobs from before the pause will continue automatically
-        | when they wake up and see PROCESSING status.
-        |--------------------------------------------------------------------------
-        */
-
-        $campaign = $campaign->fresh();
-
-        $campaign
-            ->messages()
-            ->where('status', MessageStatus::PENDING)
-            ->chunkById(500, function ($messages) {
-
-                foreach ($messages as $message) {
-
-                    $this->statusService->change(
-                        $message,
-                        MessageStatus::QUEUED
-                    );
-
-                    ProcessMessageJob::dispatch($message)
-                        ->onQueue('messages');
-                }
-            });
+        app(ResumeCampaignAction::class)->execute($campaign);
     }
 
     public function cancel(Campaign $campaign): void
     {
-        $campaign->refresh();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Only cancellable campaigns can be cancelled
-        |--------------------------------------------------------------------------
-        */
-
-        if (! $campaign->status->canCancel()) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Atomic State Transition
-        |--------------------------------------------------------------------------
-        */
-
-        $updated = $campaign->newQuery()
-            ->whereKey($campaign->id)
-            ->whereIn('status', [
-                CampaignStatus::DRAFT,
-                CampaignStatus::SCHEDULED,
-                CampaignStatus::PROCESSING,
-                CampaignStatus::PAUSED,
-            ])
-            ->update([
-                'status' => CampaignStatus::CANCELLED,
-                'cancelled_at' => now(),
-            ]);
-
-        if ($updated !== 1) {
-            return;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Mark Messages That Were Never Sent
-        |--------------------------------------------------------------------------
-        */
-
-        $campaign = $campaign->fresh();
-
-        $campaign
-            ->messages()
-            ->whereIn('status', [
-                MessageStatus::PENDING,
-                MessageStatus::QUEUED,
-            ])
-            ->chunkById(500, function ($messages) {
-
-                foreach ($messages as $message) {
-
-                    $this->statusService->change(
-                        $message,
-                        MessageStatus::FAILED,
-                        [
-                            'failure_reason' =>
-                            'Campaign was cancelled before message was sent.',
-                        ]
-                    );
-                }
-            });
+        app(CancelCampaignAction::class)->execute($campaign);
     }
 
     public function complete(Campaign $campaign): void
     {
         $campaign->refresh();
 
-        /*
-        |--------------------------------------------------------------------------
-        | Only a processing campaign can become completed
-        |--------------------------------------------------------------------------
-        */
-
         if ($campaign->status !== CampaignStatus::PROCESSING) {
             return;
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Campaign Must Have Messages
-        |--------------------------------------------------------------------------
-        */
 
         if ($campaign->messages()->doesntExist()) {
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Wait Until All Messages Reach A Final State
-        |--------------------------------------------------------------------------
-        */
-
         if (! $campaign->isReadyToComplete()) {
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Atomic State Transition
-        |--------------------------------------------------------------------------
-        */
-
-        $updated = $campaign->newQuery()
+        $updated = Campaign::query()
             ->whereKey($campaign->id)
             ->where('status', CampaignStatus::PROCESSING)
             ->update([
@@ -226,17 +77,8 @@ class CampaignWorkflowService
                 'completed_at' => now(),
             ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dispatch Completion Event Only Once
-        |--------------------------------------------------------------------------
-        */
-
         if ($updated === 1) {
-
-            event(new CampaignCompleted(
-                $campaign->fresh()
-            ));
+            event(new CampaignCompleted($campaign->fresh()));
         }
     }
 
@@ -244,59 +86,102 @@ class CampaignWorkflowService
         Campaign $campaign,
         array $messageIds
     ): int {
+        $messageIds = array_values(array_unique(array_filter(
+            array_map('intval', $messageIds),
+            fn (int $id) => $id > 0
+        )));
 
-        $campaign->refresh();
-
-        $messages = $campaign->messages()
-            ->whereIn('id', $messageIds)
-            ->where('status', MessageStatus::FAILED)
-            ->get()
-            ->filter(fn($message) => $message->canRetry());
-
-        if ($messages->isEmpty()) {
+        if (empty($messageIds)) {
             return 0;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Reopen Completed Campaign
-        |--------------------------------------------------------------------------
-        */
+        return DB::transaction(function () use ($campaign, $messageIds) {
+            $lockedCampaign = Campaign::query()
+                ->whereKey($campaign->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($campaign->status === CampaignStatus::COMPLETED) {
-
-            $campaign->update([
-                'status' => CampaignStatus::PROCESSING,
-                'completed_at' => null,
-            ]);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Queue Failed Messages
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($messages as $message) {
-
-            $changed = $this->statusService->change(
-                $message,
-                MessageStatus::QUEUED,
-                [
-                    'failure_reason' => null,
-                    'retry_count' => $message->retry_count + 1,
-                    'last_retried_at' => now(),
-                ]
-            );
-
-            if (! $changed) {
-                continue;
+            if (! $lockedCampaign) {
+                return 0;
             }
 
-            ProcessMessageJob::dispatch($message->fresh())
-                ->onQueue('messages');
-        }
+            /*
+             * Cancelled, draft and scheduled campaigns cannot
+             * retry failed messages.
+             */
+            if (! in_array($lockedCampaign->status, [
+                CampaignStatus::PROCESSING,
+                CampaignStatus::PAUSED,
+                CampaignStatus::COMPLETED,
+                CampaignStatus::FAILED,
+            ], true)) {
+                return 0;
+            }
 
-        return $messages->count();
+            /*
+             * Select only failed messages belonging to this campaign
+             * and still within the retry limit.
+             */
+            $messages = Message::query()
+                ->where('campaign_id', $lockedCampaign->id)
+                ->whereIn('id', $messageIds)
+                ->where('status', MessageStatus::FAILED)
+                ->where('retry_count', '<', Message::MAX_RETRIES)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($messages->isEmpty()) {
+                return 0;
+            }
+
+            /*
+             * Reopen completed or failed campaigns only when
+             * there are actually eligible messages to retry.
+             */
+            if (in_array($lockedCampaign->status, [
+                CampaignStatus::COMPLETED,
+                CampaignStatus::FAILED,
+            ], true)) {
+                $lockedCampaign->update([
+                    'status' => CampaignStatus::PROCESSING,
+                    'completed_at' => null,
+                ]);
+            }
+
+            $queuedCount = 0;
+
+            foreach ($messages as $message) {
+                $changed = $this->statusService->change(
+                    $message,
+                    MessageStatus::QUEUED,
+                    [
+                        'failure_reason' => null,
+                        'retry_count' => $message->retry_count + 1,
+                        'last_retried_at' => now(),
+                    ]
+                );
+
+                if (! $changed) {
+                    continue;
+                }
+
+                $queuedCount++;
+
+                /*
+                 * Paused campaigns retain QUEUED messages.
+                 * ResumeCampaignAction will dispatch them later.
+                 */
+                if ($lockedCampaign->status === CampaignStatus::PAUSED) {
+                    continue;
+                }
+
+                ProcessMessageJob::dispatch($message->fresh())
+                    ->onQueue('messages')
+                    ->afterCommit();
+            }
+
+            return $queuedCount;
+        }, 3);
     }
 }

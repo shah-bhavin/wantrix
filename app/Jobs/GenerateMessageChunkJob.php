@@ -3,12 +3,16 @@
 namespace App\Jobs;
 
 use App\Actions\Conversations\FindOrCreateConversationAction;
+use App\Enums\CampaignStatus;
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
+use App\Jobs\ProcessMessageJob;
 use App\Models\Campaign;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 class GenerateMessageChunkJob implements ShouldQueue
 {
@@ -27,12 +31,6 @@ class GenerateMessageChunkJob implements ShouldQueue
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Refresh Campaign And Required Relations
-        |--------------------------------------------------------------------------
-        */
-
         $campaign = Campaign::with([
             'group',
             'template',
@@ -41,217 +39,137 @@ class GenerateMessageChunkJob implements ShouldQueue
             'whatsappAccount',
         ])->find($this->campaign->id);
 
-        if (! $campaign) {
+        if (! $campaign || ! $campaign->group) {
             return;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Get Contacts
-        |--------------------------------------------------------------------------
-        */
-
-        if (! $campaign->group) {
+        if ($campaign->status !== CampaignStatus::DRAFT) {
             return;
         }
 
-        $contacts = $campaign
-            ->group
+        if (
+            (int) $campaign->group->vendor_id !==
+            (int) $campaign->vendor_id
+        ) {
+            return;
+        }
+
+        $contacts = $campaign->group
             ->contacts()
             ->whereIn('contacts.id', $this->contactIds)
+            ->where('contacts.vendor_id', $campaign->vendor_id)
             ->get();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Resolve Message Data Once
-        |--------------------------------------------------------------------------
-        */
 
         $messageType = $this->resolveMessageType($campaign);
         $messageBody = $this->resolveMessageBody($campaign);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Create Messages
-        |--------------------------------------------------------------------------
-        */
-
         foreach ($contacts as $contact) {
-
             if ($this->batch()?->cancelled()) {
                 return;
             }
 
-            $conversation = app(
-                FindOrCreateConversationAction::class
-            )->execute(
-                $contact,
-                $campaign->whatsappAccount
-            );
-
-            /*
-            |--------------------------------------------------------------------------
-            | Prevent Duplicate Message Creation
-            |--------------------------------------------------------------------------
-            */
-
-            $alreadyExists = $campaign
-                ->messages()
-                ->where('contact_id', $contact->id)
-                ->exists();
-
-            if ($alreadyExists) {
-                continue;
+            if ($campaign->fresh()?->status !== CampaignStatus::DRAFT) {
+                return;
             }
 
-            $message = $campaign
-                ->messages()
-                ->create([
-
-                    'vendor_id' => $campaign->vendor_id,
-
-                    'campaign_id' => $campaign->id,
-
-                    'conversation_id' => $conversation->id,
-
-                    'contact_id' => $contact->id,
-
-                    'direction' => 'outgoing',
-
-                    'whatsapp_account_id' =>
-                    $campaign->whatsapp_account_id,
-
+            try {
+                DB::transaction(function () use (
+                    $campaign,
+                    $contact,
+                    $messageType,
+                    $messageBody
+                ) {
                     /*
-                    |--------------------------------------------------------------------------
-                    | Local / Meta Template
-                    |--------------------------------------------------------------------------
-                    */
+                     * Fast check. The database unique index below
+                     * remains the final concurrency protection.
+                     */
+                    $exists = $campaign->messages()
+                        ->where('contact_id', $contact->id)
+                        ->exists();
 
-                    'whatsapp_template_id' =>
-                        $campaign->whatsapp_template_id,
+                    if ($exists) {
+                        return;
+                    }
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Media
-                    |--------------------------------------------------------------------------
-                    */
+                    $conversation = app(
+                        FindOrCreateConversationAction::class
+                    )->execute(
+                        $contact,
+                        $campaign->whatsappAccount
+                    );
 
-                    'media_library_id' =>
-                    $campaign->media_library_id,
+                    $message = $campaign->messages()->create([
+                        'vendor_id' => $campaign->vendor_id,
+                        'campaign_id' => $campaign->id,
+                        'conversation_id' => $conversation->id,
+                        'contact_id' => $contact->id,
+                        'direction' => 'outgoing',
+                        'whatsapp_account_id' =>
+                            $campaign->whatsapp_account_id,
+                        'whatsapp_template_id' =>
+                            $campaign->whatsapp_template_id,
+                        'media_library_id' =>
+                            $campaign->media_library_id,
+                        'type' => $messageType,
+                        'body' => $messageBody ?? '',
+                        'template_variables' => [],
+                        'status' => MessageStatus::PENDING,
+                    ]);
 
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Message Content
-                    |--------------------------------------------------------------------------
-                    */
+                    $message->statusHistories()->create([
+                        'status' => MessageStatus::PENDING,
+                        'changed_at' => now(),
+                    ]);
 
-                    'type' => $messageType,
-
-                    /*
-                    |--------------------------------------------------------------------------
-                    | IMPORTANT
-                    |
-                    | messages.body is NOT NULL in database.
-                    | For media-only messages we store an empty string.
-                    |--------------------------------------------------------------------------
-                    */
-
-                    'body' => $messageBody ?? '',
-
-                    'template_variables' => [],
-
-                    'status' => MessageStatus::PENDING,
-
-                ]);
-
-            $conversation->touchOutgoing();
-
-            $message->statusHistories()->create([
-                'status' => MessageStatus::PENDING,
-                'changed_at' => now(),
-            ]);
+                    $conversation->touchOutgoing();
+                }, 3);
+            } catch (QueryException $exception) {
+                /*
+                 * Another worker may have inserted the same
+                 * campaign/contact message at the same time.
+                 * Ignore only this specific unique-index conflict.
+                 */
+                if (! $this->isCampaignContactDuplicate($exception)) {
+                    throw $exception;
+                }
+            }
         }
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Resolve Message Type
-    |--------------------------------------------------------------------------
-    */
+    protected function isCampaignContactDuplicate(
+        QueryException $exception
+    ): bool {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains(
+            $message,
+            'messages_campaign_contact_unique'
+        ) || str_contains(
+            $message,
+            'messages.campaign_id, messages.contact_id'
+        );
+    }
 
     protected function resolveMessageType(
         Campaign $campaign
     ): MessageType {
-
-        /*
-    |--------------------------------------------------------------------------
-    | Meta / WhatsApp Approved Template
-    |--------------------------------------------------------------------------
-    */
-
         if ($campaign->whatsapp_template_id) {
             return MessageType::TEMPLATE;
         }
-
-        /*
-    |--------------------------------------------------------------------------
-    | Direct / Media Campaign
-    |--------------------------------------------------------------------------
-    */
 
         if ($campaign->message_type instanceof MessageType) {
             return $campaign->message_type;
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | Safe Fallback
-    |--------------------------------------------------------------------------
-    */
-
         return MessageType::TEXT;
     }
-    /*
-    |--------------------------------------------------------------------------
-    | Resolve Message Body
-    |--------------------------------------------------------------------------
-    */
 
     protected function resolveMessageBody(
         Campaign $campaign
     ): string {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Local Template Body
-        |--------------------------------------------------------------------------
-        */
-
         if ($campaign->template) {
             return $campaign->template->body ?? '';
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Direct Text Campaign
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $campaign->message_type === MessageType::TEXT ||
-            $campaign->message_type === 'text'
-        ) {
-            return $campaign->message_body ?? '';
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Media Campaign Caption / Body
-        |--------------------------------------------------------------------------
-        |
-        | Video, Image, Document, Audio can have empty body.
-        |--------------------------------------------------------------------------
-        */
 
         return $campaign->message_body ?? '';
     }

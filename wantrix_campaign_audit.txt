@@ -1,0 +1,1647 @@
+
+
+==========================================================================================
+
+FILE: app\Actions\Campaigns\GenerateCampaignMessagesAction.php
+==========================================================================================
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Enums\MessageType;
+use App\Jobs\GenerateCampaignMessagesJob;
+use App\Models\Campaign;
+
+class GenerateCampaignMessagesAction
+{
+    public function execute(Campaign $campaign): void
+    {
+        $campaign->load([
+            'group',
+            'template',
+            'whatsappTemplate',
+            'media',
+            'whatsappAccount',
+        ]);
+
+        if (! $campaign->group) {
+            throw new \Exception('Campaign group not found.');
+        }
+
+        if (! $campaign->whatsappAccount) {
+            throw new \Exception('WhatsApp account not found.');
+        }
+
+        switch ($campaign->message_type) {
+
+            case MessageType::TEXT:
+
+                if (
+                    empty($campaign->message_body)
+                    && ! $campaign->template
+                ) {
+                    throw new \Exception(
+                        'Text campaign requires a direct message or local template.'
+                    );
+                }
+
+                break;
+
+            case MessageType::TEMPLATE:
+
+                if (! $campaign->whatsappTemplate) {
+                    throw new \Exception(
+                        'Meta WhatsApp template not found.'
+                    );
+                }
+
+                break;
+
+            case MessageType::IMAGE:
+            case MessageType::VIDEO:
+            case MessageType::DOCUMENT:
+            case MessageType::AUDIO:
+
+                if (! $campaign->media) {
+                    throw new \Exception(
+                        'Campaign media not found.'
+                    );
+                }
+
+                break;
+
+            default:
+
+                throw new \Exception(
+                    'Unsupported campaign message type.'
+                );
+        }
+
+        GenerateCampaignMessagesJob::dispatch($campaign);
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Actions\Campaigns\DispatchCampaignAction.php
+==========================================================================================
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Enums\CampaignStatus;
+use App\Models\Campaign;
+use App\Services\CampaignDispatcherService;
+
+class DispatchCampaignAction
+{
+    public function execute(Campaign $campaign): bool
+    {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Must Be Ready To Dispatch
+        |--------------------------------------------------------------------------
+        |
+        | Manual dispatch:
+        | DRAFT → PROCESSING
+        |
+        | Scheduled dispatch:
+        | SCHEDULED → PROCESSING
+        |--------------------------------------------------------------------------
+        */
+
+        if (! in_array(
+            $campaign->status,
+            [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+            ],
+            true
+        )) {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Must Have Generated Messages
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $campaign->messages_generated_at === null
+            || $campaign->messages()->doesntExist()
+        ) {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Atomic State Protection
+        |--------------------------------------------------------------------------
+        |
+        | Only one process can successfully change the campaign
+        | to PROCESSING.
+        |--------------------------------------------------------------------------
+        */
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->whereIn('status', [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+            ])
+            ->update([
+                'status' => CampaignStatus::PROCESSING,
+                'started_at' => now(),
+                'completed_at' => null,
+                'cancelled_at' => null,
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Another Process Already Started This Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        if ($updated !== 1) {
+            return false;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Messages
+        |--------------------------------------------------------------------------
+        */
+
+        app(CampaignDispatcherService::class)
+            ->dispatch($campaign->fresh());
+
+        return true;
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Actions\Campaigns\PauseCampaignAction.php
+==========================================================================================
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Enums\CampaignStatus;
+use App\Events\CampaignPaused;
+use App\Models\Campaign;
+
+class PauseCampaignAction
+{
+    public function execute(Campaign $campaign): bool
+    {
+        $campaign->refresh();
+
+        if (! $campaign->status->canPause()) {
+            return false;
+        }
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->where('status', CampaignStatus::PROCESSING)
+            ->update([
+                'status' => CampaignStatus::PAUSED,
+            ]);
+
+        if ($updated !== 1) {
+            return false;
+        }
+
+        event(new CampaignPaused(
+            $campaign->fresh()
+        ));
+
+        return true;
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Actions\Campaigns\ResumeCampaignAction.php
+==========================================================================================
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
+use App\Events\CampaignResumed;
+use App\Jobs\ProcessMessageJob;
+use App\Models\Campaign;
+use App\Services\MessageStatusService;
+
+class ResumeCampaignAction
+{
+    //public function execute(Campaign $campaign): void {
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+
+    public function execute(Campaign $campaign): bool
+    {
+        $campaign->refresh();
+
+        if (! $campaign->status->canResume()) {
+            return false;
+        }
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->where('status', CampaignStatus::PAUSED)
+            ->update([
+                'status' => CampaignStatus::PROCESSING,
+                'completed_at' => null,
+            ]);
+
+        if ($updated !== 1) {
+            return false;
+        }
+
+        $campaign->refresh();
+
+        event(new CampaignResumed($campaign));
+
+        $delay = 0;
+
+        $campaign
+            ->messages()
+            ->whereIn('status', [
+                MessageStatus::QUEUED,
+                MessageStatus::PENDING,
+            ])
+            ->chunkById(500, function ($messages) use (
+                $campaign,
+                &$delay
+            ) {
+
+                foreach ($messages as $message) {
+
+                    /*
+            |--------------------------------------------------------------------------
+            | Pending Messages Become Queued
+            |--------------------------------------------------------------------------
+            */
+
+                    $this->statusService->change(
+                        $message,
+                        MessageStatus::QUEUED
+                    );
+
+                    ProcessMessageJob::dispatch($message)
+                        ->onQueue('messages')
+                        ->delay(
+                            now()->addSeconds($delay)
+                        );
+
+                    $delay += $campaign->message_delay_seconds;
+                }
+            });
+        return true;
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Actions\Campaigns\CancelCampaignAction.php
+==========================================================================================
+<?php
+
+namespace App\Actions\Campaigns;
+
+use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
+use App\Events\CampaignCancelled;
+use App\Models\Campaign;
+use App\Services\MessageStatusService;
+
+
+class CancelCampaignAction
+{
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+    
+    public function execute(Campaign $campaign): bool
+    {
+        $campaign->refresh();
+
+        if (! $campaign->status->canCancel()) {
+            return false;
+        }
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->whereIn('status', [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+                CampaignStatus::PROCESSING,
+                CampaignStatus::PAUSED,
+            ])
+            ->update([
+                'status' => CampaignStatus::CANCELLED,
+                'cancelled_at' => now(),
+            ]);
+
+        if ($updated !== 1) {
+            return false;
+        }
+
+        $campaign->refresh();
+
+        $messages = $campaign
+            ->messages()
+            ->whereIn('status', [
+                MessageStatus::PENDING,
+                MessageStatus::QUEUED,
+                MessageStatus::SENDING,
+            ])
+            ->get();
+
+        foreach ($messages as $message) {
+
+            $this->statusService->change(
+                $message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
+        }
+
+        event(new CampaignCancelled($campaign));
+        return true;
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Jobs\GenerateCampaignMessagesJob.php
+==========================================================================================
+<?php
+
+namespace App\Jobs;
+
+use App\Events\Campaigns\CampaignMessagesGenerated;
+use App\Models\Campaign;
+use Illuminate\Bus\Batch;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Bus;
+use Throwable;
+
+class GenerateCampaignMessagesJob implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(
+        public Campaign $campaign
+    ) {
+        $this->onQueue('campaign-generation');
+    }
+
+    public function handle(): void
+    {
+        $campaign = $this->campaign->fresh([
+            'group',
+            'template',
+            'whatsappTemplate',
+            'media',
+            'whatsappAccount',
+        ]);
+
+        if (! $campaign || ! $campaign->group) {
+            return;
+        }
+
+        $jobs = [];
+
+        $campaign->group
+            ->contacts()
+            ->select('contacts.id')
+            ->chunkById(
+                500,
+                function ($contacts) use (&$jobs, $campaign) {
+
+                    $jobs[] = (
+                        new GenerateMessageChunkJob(
+                            $campaign,
+                            $contacts->pluck('id')->all()
+                        )
+                    )->onQueue('campaign-generation');
+                }
+            );
+
+        if (empty($jobs)) {
+            $campaign->update([
+                'messages_generated_at' => now(),
+            ]);
+
+            event(
+                new CampaignMessagesGenerated($campaign)
+            );
+
+            return;
+        }
+
+        Bus::batch($jobs)
+            ->onQueue('campaign-generation')
+            ->then(
+                function (Batch $batch) use ($campaign) {
+
+                    $campaign->update([
+                        'messages_generated_at' => now(),
+                    ]);
+
+                    event(
+                        new CampaignMessagesGenerated(
+                            $campaign->fresh()
+                        )
+                    );
+                }
+            )
+            ->catch(
+                function (
+                    Batch $batch,
+                    Throwable $e
+                ) use ($campaign) {
+
+                    report($e);
+                }
+            )
+            ->dispatch();
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Jobs\GenerateMessageChunkJob.php
+==========================================================================================
+<?php
+
+namespace App\Jobs;
+
+use App\Actions\Conversations\FindOrCreateConversationAction;
+use App\Enums\MessageStatus;
+use App\Enums\MessageType;
+use App\Models\Campaign;
+use Illuminate\Bus\Batchable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+
+class GenerateMessageChunkJob implements ShouldQueue
+{
+    use Batchable, Queueable;
+
+    public function __construct(
+        public Campaign $campaign,
+        public array $contactIds,
+    ) {
+        $this->onQueue('campaign-generation');
+    }
+
+    public function handle(): void
+    {
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Refresh Campaign And Required Relations
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign = Campaign::with([
+            'group',
+            'template',
+            'whatsappTemplate',
+            'media',
+            'whatsappAccount',
+        ])->find($this->campaign->id);
+
+        if (! $campaign) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Contacts
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $campaign->group) {
+            return;
+        }
+
+        $contacts = $campaign
+            ->group
+            ->contacts()
+            ->whereIn('contacts.id', $this->contactIds)
+            ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Resolve Message Data Once
+        |--------------------------------------------------------------------------
+        */
+
+        $messageType = $this->resolveMessageType($campaign);
+        $messageBody = $this->resolveMessageBody($campaign);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create Messages
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($contacts as $contact) {
+
+            if ($this->batch()?->cancelled()) {
+                return;
+            }
+
+            $conversation = app(
+                FindOrCreateConversationAction::class
+            )->execute(
+                $contact,
+                $campaign->whatsappAccount
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prevent Duplicate Message Creation
+            |--------------------------------------------------------------------------
+            */
+
+            $alreadyExists = $campaign
+                ->messages()
+                ->where('contact_id', $contact->id)
+                ->exists();
+
+            if ($alreadyExists) {
+                continue;
+            }
+
+            $message = $campaign
+                ->messages()
+                ->create([
+
+                    'vendor_id' => $campaign->vendor_id,
+
+                    'campaign_id' => $campaign->id,
+
+                    'conversation_id' => $conversation->id,
+
+                    'contact_id' => $contact->id,
+
+                    'direction' => 'outgoing',
+
+                    'whatsapp_account_id' =>
+                    $campaign->whatsapp_account_id,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Local / Meta Template
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'whatsapp_template_id' =>
+                        $campaign->whatsapp_template_id,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Media
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'media_library_id' =>
+                    $campaign->media_library_id,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Message Content
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'type' => $messageType,
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | IMPORTANT
+                    |
+                    | messages.body is NOT NULL in database.
+                    | For media-only messages we store an empty string.
+                    |--------------------------------------------------------------------------
+                    */
+
+                    'body' => $messageBody ?? '',
+
+                    'template_variables' => [],
+
+                    'status' => MessageStatus::PENDING,
+
+                ]);
+
+            $conversation->touchOutgoing();
+
+            $message->statusHistories()->create([
+                'status' => MessageStatus::PENDING,
+                'changed_at' => now(),
+            ]);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Message Type
+    |--------------------------------------------------------------------------
+    */
+
+    protected function resolveMessageType(
+        Campaign $campaign
+    ): MessageType {
+
+        /*
+    |--------------------------------------------------------------------------
+    | Meta / WhatsApp Approved Template
+    |--------------------------------------------------------------------------
+    */
+
+        if ($campaign->whatsapp_template_id) {
+            return MessageType::TEMPLATE;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Direct / Media Campaign
+    |--------------------------------------------------------------------------
+    */
+
+        if ($campaign->message_type instanceof MessageType) {
+            return $campaign->message_type;
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | Safe Fallback
+    |--------------------------------------------------------------------------
+    */
+
+        return MessageType::TEXT;
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Resolve Message Body
+    |--------------------------------------------------------------------------
+    */
+
+    protected function resolveMessageBody(
+        Campaign $campaign
+    ): string {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Local Template Body
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->template) {
+            return $campaign->template->body ?? '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Direct Text Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $campaign->message_type === MessageType::TEXT ||
+            $campaign->message_type === 'text'
+        ) {
+            return $campaign->message_body ?? '';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Media Campaign Caption / Body
+        |--------------------------------------------------------------------------
+        |
+        | Video, Image, Document, Audio can have empty body.
+        |--------------------------------------------------------------------------
+        */
+
+        return $campaign->message_body ?? '';
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Console\Commands\ProcessScheduledCampaigns.php
+==========================================================================================
+<?php
+
+namespace App\Console\Commands;
+
+use App\Actions\Campaigns\DispatchCampaignAction;
+use App\Enums\CampaignStatus;
+use App\Models\Campaign;
+use Illuminate\Console\Attributes\Description;
+use Illuminate\Console\Attributes\Signature;
+use Illuminate\Console\Command;
+
+#[Signature('app:process-scheduled-campaigns')]
+#[Description('Process campaigns whose scheduled time has arrived.')]
+class ProcessScheduledCampaigns extends Command
+{
+    public function handle(
+        DispatchCampaignAction $dispatchCampaign
+    ): int {
+
+        Campaign::query()
+            ->where('status', CampaignStatus::SCHEDULED)
+            ->whereNotNull('scheduled_at')
+            ->whereNotNull('messages_generated_at')
+            ->where('scheduled_at', '<=', now())
+            ->chunkById(100, function ($campaigns) use (
+                $dispatchCampaign
+            ) {
+
+                foreach ($campaigns as $campaign) {
+
+                    $started = $dispatchCampaign
+                        ->execute($campaign);
+
+                    if ($started) {
+
+                        $this->info(
+                            "Campaign #{$campaign->id} started."
+                        );
+
+                    } else {
+
+                        $this->line(
+                            "Campaign #{$campaign->id} was not dispatched."
+                        );
+                    }
+                }
+            });
+
+        return self::SUCCESS;
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Services\CampaignDispatcherService.php
+==========================================================================================
+<?php
+
+namespace App\Services;
+
+use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
+use App\Events\CampaignStarted;
+use App\Jobs\ProcessMessageJob;
+use App\Models\Campaign;
+
+class CampaignDispatcherService
+{
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+
+    public function dispatch(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Only Processing Campaigns
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== CampaignStatus::PROCESSING) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fire Campaign Started Event
+        |--------------------------------------------------------------------------
+        */
+
+        event(new CampaignStarted(
+            $campaign->fresh()
+        ));
+
+        $delay = 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queue Only Pending Messages
+        |
+        | This is the initial campaign dispatch.
+        | retry_count must NOT be incremented here.
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign
+            ->messages()
+            ->where('status', MessageStatus::PENDING)
+            ->chunkById(500, function ($messages) use (
+                $campaign,
+                &$delay
+            ) {
+
+                foreach ($messages as $message) {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Move Message To Queue
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $changed = $this->statusService->change(
+                        $message,
+                        MessageStatus::QUEUED,
+                        [
+                            'failure_reason' => null,
+                        ]
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Do Not Dispatch If Status Change Failed
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (! $changed) {
+                        continue;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Dispatch Message Job
+                    |--------------------------------------------------------------------------
+                    */
+
+                    ProcessMessageJob::dispatch($message)
+                        ->onQueue('messages')
+                        ->delay(
+                            now()->addSeconds($delay)
+                        );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Apply Campaign Message Delay
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $delay += max(
+                        0,
+                        (int) $campaign->message_delay_seconds
+                    );
+                }
+            });
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Services\CampaignWorkflowService.php
+==========================================================================================
+<?php
+
+namespace App\Services;
+
+use App\Actions\Campaigns\GenerateCampaignMessagesAction;
+use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
+use App\Events\CampaignCompleted;
+use App\Events\CampaignPaused;
+use App\Jobs\ProcessMessageJob;
+use App\Models\Campaign;
+
+class CampaignWorkflowService
+{
+    public function __construct(
+        protected MessageStatusService $statusService
+    ) {}
+
+    public function generateMessages(Campaign $campaign): void
+    {
+        if (! $campaign->canGenerateMessages()) {
+            throw new \Exception('Messages already generated.');
+        }
+
+        app(GenerateCampaignMessagesAction::class)
+            ->execute($campaign);
+    }
+
+    public function send(Campaign $campaign): void
+    {
+        //
+    }
+
+    public function pause(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        if (! $campaign->status->canPause()) {
+            return;
+        }
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->where('status', CampaignStatus::PROCESSING)
+            ->update([
+                'status' => CampaignStatus::PAUSED,
+            ]);
+
+        if ($updated === 1) {
+            event(new CampaignPaused($campaign->fresh()));
+        }
+    }
+
+    public function resume(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Only paused campaigns can be resumed
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== CampaignStatus::PAUSED) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Atomic State Transition
+        |--------------------------------------------------------------------------
+        */
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->where('status', CampaignStatus::PAUSED)
+            ->update([
+                'status' => CampaignStatus::PROCESSING,
+            ]);
+
+        if ($updated !== 1) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queue Pending Messages
+        |
+        | Queued jobs from before the pause will continue automatically
+        | when they wake up and see PROCESSING status.
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign = $campaign->fresh();
+
+        $campaign
+            ->messages()
+            ->where('status', MessageStatus::PENDING)
+            ->chunkById(500, function ($messages) {
+
+                foreach ($messages as $message) {
+
+                    $this->statusService->change(
+                        $message,
+                        MessageStatus::QUEUED
+                    );
+
+                    ProcessMessageJob::dispatch($message)
+                        ->onQueue('messages');
+                }
+            });
+    }
+
+    public function cancel(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Only cancellable campaigns can be cancelled
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $campaign->status->canCancel()) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Atomic State Transition
+        |--------------------------------------------------------------------------
+        */
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->whereIn('status', [
+                CampaignStatus::DRAFT,
+                CampaignStatus::SCHEDULED,
+                CampaignStatus::PROCESSING,
+                CampaignStatus::PAUSED,
+            ])
+            ->update([
+                'status' => CampaignStatus::CANCELLED,
+                'cancelled_at' => now(),
+            ]);
+
+        if ($updated !== 1) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark Messages That Were Never Sent
+        |--------------------------------------------------------------------------
+        */
+
+        $campaign = $campaign->fresh();
+
+        $campaign
+            ->messages()
+            ->whereIn('status', [
+                MessageStatus::PENDING,
+                MessageStatus::QUEUED,
+            ])
+            ->chunkById(500, function ($messages) {
+
+                foreach ($messages as $message) {
+
+                    $this->statusService->change(
+                        $message,
+                        MessageStatus::FAILED,
+                        [
+                            'failure_reason' =>
+                            'Campaign was cancelled before message was sent.',
+                        ]
+                    );
+                }
+            });
+    }
+
+    public function complete(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Only a processing campaign can become completed
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== CampaignStatus::PROCESSING) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Must Have Messages
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->messages()->doesntExist()) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Wait Until All Messages Reach A Final State
+        |--------------------------------------------------------------------------
+        */
+
+        if (! $campaign->isReadyToComplete()) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Atomic State Transition
+        |--------------------------------------------------------------------------
+        */
+
+        $updated = $campaign->newQuery()
+            ->whereKey($campaign->id)
+            ->where('status', CampaignStatus::PROCESSING)
+            ->update([
+                'status' => CampaignStatus::COMPLETED,
+                'completed_at' => now(),
+            ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Completion Event Only Once
+        |--------------------------------------------------------------------------
+        */
+
+        if ($updated === 1) {
+
+            event(new CampaignCompleted(
+                $campaign->fresh()
+            ));
+        }
+    }
+
+    public function retryFailedMessages(
+        Campaign $campaign,
+        array $messageIds
+    ): int {
+
+        $campaign->refresh();
+
+        $messages = $campaign->messages()
+            ->whereIn('id', $messageIds)
+            ->where('status', MessageStatus::FAILED)
+            ->get()
+            ->filter(fn($message) => $message->canRetry());
+
+        if ($messages->isEmpty()) {
+            return 0;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reopen Completed Campaign
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status === CampaignStatus::COMPLETED) {
+
+            $campaign->update([
+                'status' => CampaignStatus::PROCESSING,
+                'completed_at' => null,
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queue Failed Messages
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($messages as $message) {
+
+            $changed = $this->statusService->change(
+                $message,
+                MessageStatus::QUEUED,
+                [
+                    'failure_reason' => null,
+                    'retry_count' => $message->retry_count + 1,
+                    'last_retried_at' => now(),
+                ]
+            );
+
+            if (! $changed) {
+                continue;
+            }
+
+            ProcessMessageJob::dispatch($message->fresh())
+                ->onQueue('messages');
+        }
+
+        return $messages->count();
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Services\MessageStatusService.php
+==========================================================================================
+<?php
+
+namespace App\Services;
+
+use App\Enums\MessageStatus;
+use App\Models\Message;
+use Illuminate\Support\Facades\DB;
+
+class MessageStatusService
+{
+    /**
+     * Change message status safely.
+     *
+     * The message update and its status history entry are
+     * committed together, or neither is committed.
+     */
+    public function change(
+        Message $message,
+        MessageStatus $status,
+        array $attributes = []
+    ): bool {
+        return DB::transaction(function () use (
+            $message,
+            $status,
+            $attributes
+        ): bool {
+            $lockedMessage = Message::query()
+                ->whereKey($message->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedMessage) {
+                return false;
+            }
+
+            $oldStatus = $lockedMessage->status;
+
+            // Same status: update attributes without creating
+            // a duplicate status-history entry.
+            if ($oldStatus === $status) {
+                if (! empty($attributes)) {
+                    $lockedMessage->update($attributes);
+                }
+
+                $message->refresh();
+
+                return true;
+            }
+
+            // Never permit an unknown or invalid transition.
+            if (
+                ! $oldStatus instanceof MessageStatus
+                || ! $this->canTransition($oldStatus, $status)
+            ) {
+                return false;
+            }
+
+            $lockedMessage->update([
+                ...$attributes,
+                'status' => $status,
+            ]);
+
+            $lockedMessage->statusHistories()->create([
+                'status' => $status,
+                'changed_at' => now(),
+            ]);
+
+            // Keep the caller's model instance up to date.
+            $message->refresh();
+
+            return true;
+        }, 3);
+    }
+
+    /**
+     * Validate the permitted message status transitions.
+     */
+    protected function canTransition(
+        MessageStatus $from,
+        MessageStatus $to
+    ): bool {
+        return match ($from) {
+            MessageStatus::PENDING => in_array($to, [
+                MessageStatus::QUEUED,
+                MessageStatus::SENDING,
+                MessageStatus::FAILED,
+            ], true),
+
+            MessageStatus::QUEUED => in_array($to, [
+                MessageStatus::SENDING,
+                MessageStatus::FAILED,
+            ], true),
+
+            MessageStatus::SENDING => in_array($to, [
+                MessageStatus::QUEUED,
+                MessageStatus::SENT,
+                MessageStatus::FAILED,
+            ], true),
+
+            MessageStatus::SENT => in_array($to, [
+                MessageStatus::DELIVERED,
+                MessageStatus::FAILED,
+            ], true),
+
+            MessageStatus::DELIVERED => in_array($to, [
+                MessageStatus::READ,
+                MessageStatus::FAILED,
+            ], true),
+
+            MessageStatus::FAILED => $to === MessageStatus::QUEUED,
+
+            MessageStatus::READ => false,
+        };
+    }
+}
+
+
+==========================================================================================
+
+FILE: app\Jobs\ProcessMessageJob.php
+==========================================================================================
+<?php
+
+namespace App\Jobs;
+
+use App\Enums\CampaignStatus;
+use App\Enums\MessageStatus;
+use App\Models\Message;
+use App\Services\CampaignWorkflowService;
+use App\Services\MessageStatusService;
+use App\Services\Whatsapp\WhatsappManager;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+class ProcessMessageJob implements ShouldQueue, ShouldBeUnique
+{
+    use Queueable, InteractsWithQueue, SerializesModels;
+
+    public bool $deleteWhenMissingModels = true;
+    public int $tries = 3;
+    public array $backoff = [10, 30, 60];
+    public bool $failOnTimeout = true;
+    public int $timeout = 120;
+
+    public function uniqueId(): string
+    {
+        return 'message-' . $this->message->id;
+    }
+
+    public function __construct(
+        public Message $message
+    ) {
+        $this->onQueue('messages');
+    }
+
+    public function handle(
+        WhatsappManager $manager,
+        CampaignWorkflowService $workflow,
+        MessageStatusService $statusService
+    ): void {
+
+        $this->message->refresh();
+
+        $campaign = $this->message->campaign;
+
+        if (! $campaign) {
+            return;
+        }
+
+        $campaign->refresh();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Cancelled
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status === CampaignStatus::CANCELLED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Paused
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status === CampaignStatus::PAUSED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::QUEUED
+            );
+
+            $this->release(30);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Campaign Must Be Processing
+        |--------------------------------------------------------------------------
+        */
+
+        if ($campaign->status !== CampaignStatus::PROCESSING) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ignore Already Processed Messages
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            in_array($this->message->status, [
+                MessageStatus::SENT,
+                MessageStatus::DELIVERED,
+                MessageStatus::READ,
+            ])
+            || filled($this->message->provider_message_id)
+        ) {
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mark As Sending
+        |--------------------------------------------------------------------------
+        */
+
+        $changed = $statusService->change(
+            $this->message,
+            MessageStatus::SENDING,
+            [
+                'failure_reason' => null,
+            ]
+        );
+
+        if (! $changed) {
+            return;
+        }
+
+        $this->message->refresh();
+
+        /*
+|--------------------------------------------------------------------------
+| Re-check Campaign Before Sending
+|--------------------------------------------------------------------------
+*/
+
+        $campaign->refresh();
+
+        if ($campaign->status === CampaignStatus::CANCELLED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' =>
+                    'Campaign was cancelled before message was sent.',
+                ]
+            );
+
+            return;
+        }
+
+        if ($campaign->status === CampaignStatus::PAUSED) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::QUEUED
+            );
+
+            $this->release(30);
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Message
+        |--------------------------------------------------------------------------
+        */
+
+        $provider = $manager->account(
+            $campaign->whatsappAccount
+        );
+
+        if (
+            $this->message->media &&
+            ! $this->message->media->uploaded_to_meta
+        ) {
+
+            $upload = $provider->uploadMedia(
+                $campaign->whatsappAccount,
+                $this->message->media
+            );
+
+            if (! $upload['success']) {
+
+                $statusService->change(
+                    $this->message,
+                    MessageStatus::FAILED,
+                    [
+                        'failure_reason' => $upload['error'] ?? 'Unable to upload media.'
+                    ]
+                );
+
+                $workflow->complete($campaign->fresh());
+
+                return;
+            }
+
+            // Refresh relationship so MetaProvider can read meta_media_id
+            $this->message->refresh()->load('media');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Message
+        |--------------------------------------------------------------------------
+        */
+
+        $response = $provider->send(
+            $this->message
+        );
+
+        /*
+|--------------------------------------------------------------------------
+| Handle Message Response
+|--------------------------------------------------------------------------
+*/
+
+        $messageId = $response['message_id'] ?? null;
+
+        if (
+            ($response['success'] ?? false)
+            && filled($messageId)
+        ) {
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::SENT,
+                [
+                    'sent_at' => now(),
+                    'provider_message_id' => $messageId,
+                    'failure_reason' => null,
+                ]
+            );
+        } else {
+
+            $failureReason = $response['error']
+                ?? (
+                    ($response['success'] ?? false)
+                    ? 'Meta accepted the message request but no provider message ID was returned.'
+                    : 'Message failed to send.'
+                );
+
+            $statusService->change(
+                $this->message,
+                MessageStatus::FAILED,
+                [
+                    'failure_reason' => $failureReason,
+                ]
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Check Campaign Completion
+        |--------------------------------------------------------------------------
+        */
+
+        $workflow->complete(
+            $campaign->fresh()
+        );
+    }
+    public function retryUntil(): \DateTime
+    {
+        return now()->addMinutes(5);
+    }
+    public function failed(\Throwable $exception): void
+    {
+        app(MessageStatusService::class)->change(
+            $this->message,
+            MessageStatus::FAILED,
+            [
+                'failure_reason' => $exception->getMessage()
+                    ?: 'Message processing failed unexpectedly.',
+            ]
+        );
+    }
+}

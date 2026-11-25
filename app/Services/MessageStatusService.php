@@ -8,38 +8,34 @@ use Illuminate\Support\Facades\DB;
 
 class MessageStatusService
 {
-    /**
-     * Change message status safely.
-     *
-     * The message update and its status history entry are
-     * committed together, or neither is committed.
-     */
     public function change(
         Message $message,
         MessageStatus $status,
         array $attributes = []
     ): bool {
-        return DB::transaction(function () use (
-            $message,
-            $status,
-            $attributes
-        ): bool {
-            $lockedMessage = Message::query()
+        return DB::transaction(function () use ($message, $status, $attributes) {
+            $locked = Message::query()
                 ->whereKey($message->getKey())
                 ->lockForUpdate()
                 ->first();
 
-            if (! $lockedMessage) {
+            if (! $locked || ! $locked->status instanceof MessageStatus) {
                 return false;
             }
 
-            $oldStatus = $lockedMessage->status;
+            $oldStatus = $locked->status;
 
-            // Same status: update attributes without creating
-            // a duplicate status-history entry.
+            // Never allow a second worker to claim an already-sending message.
+            if (
+                $oldStatus === MessageStatus::SENDING
+                && $status === MessageStatus::SENDING
+            ) {
+                return false;
+            }
+
             if ($oldStatus === $status) {
-                if (! empty($attributes)) {
-                    $lockedMessage->update($attributes);
+                if ($attributes !== []) {
+                    $locked->update($attributes);
                 }
 
                 $message->refresh();
@@ -47,34 +43,26 @@ class MessageStatusService
                 return true;
             }
 
-            // Never permit an unknown or invalid transition.
-            if (
-                ! $oldStatus instanceof MessageStatus
-                || ! $this->canTransition($oldStatus, $status)
-            ) {
+            if (! $this->canTransition($oldStatus, $status)) {
                 return false;
             }
 
-            $lockedMessage->update([
+            $locked->update([
                 ...$attributes,
                 'status' => $status,
             ]);
 
-            $lockedMessage->statusHistories()->create([
+            $locked->statusHistories()->create([
                 'status' => $status,
                 'changed_at' => now(),
             ]);
 
-            // Keep the caller's model instance up to date.
             $message->refresh();
 
             return true;
         }, 3);
     }
 
-    /**
-     * Validate the permitted message status transitions.
-     */
     protected function canTransition(
         MessageStatus $from,
         MessageStatus $to
@@ -94,11 +82,14 @@ class MessageStatusService
             MessageStatus::SENDING => in_array($to, [
                 MessageStatus::QUEUED,
                 MessageStatus::SENT,
+                MessageStatus::DELIVERED,
+                MessageStatus::READ,
                 MessageStatus::FAILED,
             ], true),
 
             MessageStatus::SENT => in_array($to, [
                 MessageStatus::DELIVERED,
+                MessageStatus::READ,
                 MessageStatus::FAILED,
             ], true),
 

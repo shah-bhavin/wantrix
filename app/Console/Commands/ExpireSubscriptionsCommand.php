@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -11,19 +12,26 @@ use Illuminate\Console\Command;
 #[Description('Command description')]
 class ExpireSubscriptionsCommand extends Command
 {
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    protected $signature = 'app:expire-subscriptions-command';
+
+    protected $description = 'Expire subscriptions whose end date has passed';
+
+    public function handle(): int
     {
-        Subscription::query()
+        $expiredCount = Subscription::query()
             ->whereIn('status', [
-                'trial',
-                'active',
+                SubscriptionStatus::TRIAL,
+                SubscriptionStatus::ACTIVE,
             ])
-            ->where('ends_at', '<', now())
+            ->whereNotNull('ends_at')
+            ->where('ends_at', '<=', now())
             ->update([
-                'status' => 'expired'
+                'status' => SubscriptionStatus::EXPIRED,
+                'updated_at' => now(),
             ]);
+
+        $this->info("Expired subscriptions: {$expiredCount}");
+
+        return self::SUCCESS;
     }
 }
